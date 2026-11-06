@@ -11,12 +11,14 @@ Tests prove the logic. This proves a person sees the right thing. Do both.
 
 This machine is shared. Never use port 3000 or a port another project holds.
 
+First start Postgres and apply migrations: `docker compose up -d --wait`, then `pnpm db:migrate`. Copy `.env.example` to `.env` if it is missing.
+
 ```sh
 PORT=$(node -e 'const s=require("net").createServer().listen(0,()=>{console.log(s.address().port);s.close()})')
 pnpm dev --port "$PORT"   # run in the background
 ```
 
-Wait until `curl -fsS -o /dev/null "http://localhost:$PORT/"` succeeds. If the change touches server code, routes, or `vite.config.ts`, also check the production build: `pnpm build`, then `PORT=$PORT node .output/server/index.mjs`.
+Wait until `curl -fsS -o /dev/null "http://localhost:$PORT/"` succeeds. If the change touches server code, routes, or `vite.config.ts`, also check the production build: `pnpm build`, then `PORT=$PORT node --env-file=.env .output/server/index.mjs`.
 
 ## 2. Drive it with the Playwright MCP
 

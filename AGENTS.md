@@ -36,9 +36,11 @@ Every file in `src/` opens with `// Owns: <what this file is for>. Not here: <wh
 
 `src/routeTree.gen.ts` is rebuilt from `src/routes/` on every `pnpm dev` and `pnpm build`. Never edit it. Change the route files instead.
 
+`src/db/auth-schema.gen.ts` holds the better-auth tables. After changing better-auth plugins in `src/server/auth.ts`, run `pnpm auth:schema`, then `pnpm db:generate`.
+
 ## Before you finish
 
-Always run `pnpm check` (lint and format) and `pnpm typecheck`. `pnpm format` fixes formatting. Then add:
+Always run `pnpm check` (lint and format), `pnpm typecheck`, and `pnpm test` (needs `docker compose up -d`). `pnpm format` fixes formatting. Then add:
 
 - `pnpm build` when you change routes, server code, or `vite.config.ts`. To try the result, run `node .output/server/index.mjs`.
 - `pnpm lint:probes` when you change `.oxlintrc.json`. Also add a probe and a row in `docs/lint-rules.md` for each new rule.

@@ -41,12 +41,47 @@ jobs:
           node-version-file: .node-version
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
-      - name: Server answers on /
+      - name: Server answers on / and /api/auth/get-session
+        env:
+          DATABASE_URL: postgres://ci:ci@127.0.0.1:5432/unused
+          BETTER_AUTH_SECRET: ci-only-secret-0123456789abcdefgh
+          BETTER_AUTH_URL: http://localhost:3000
         run: |
           PORT=3000 node .output/server/index.mjs &
           for _ in $(seq 1 20); do
-            curl -fsS -o /dev/null http://localhost:3000/ && exit 0
+            curl -fsS -o /dev/null http://localhost:3000/ && curl -fsS http://localhost:3000/api/auth/get-session && exit 0
             sleep 0.5
           done
-          echo "Server did not answer with 200 on / within 10s" >&2
+          echo "Server did not answer with 200 on / and /api/auth/get-session within 10s" >&2
           exit 1
+
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: ruang
+          POSTGRES_PASSWORD: ruang
+          POSTGRES_DB: ruang_test
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U ruang -d ruang_test"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 15
+    env:
+      DATABASE_URL: postgres://ruang:ruang@127.0.0.1:5433/ruang_test
+      TEST_DATABASE_URL: postgres://ruang:ruang@127.0.0.1:5433/ruang_test
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+        with:
+          cache: true
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm db:migrate
+      - run: pnpm test
