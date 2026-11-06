@@ -2,6 +2,8 @@
 
 A general LMS for any class and any subject, with an AI tutor chat. Product intent comes from the physics-only "Ruang Fisika" design in `../mspd/` (PRDs in `a1/`, `a3/`; tutor prompt and tests in `a6/`). That folder exists only on the original machine. Read it for intent, not as rules for this repo.
 
+What to build next, settled and open decisions, and constraints are in `PLAN.md`. Update its status table in the PR that moves a phase.
+
 The data model, and the libraries chosen for it, are in `docs/data-model.md`. Use those: Postgres with Drizzle, better-auth with username login, and ArkType to parse input. Don't add an alternative such as Prisma or zod.
 
 ## Identity and GitHub
