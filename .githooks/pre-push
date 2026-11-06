@@ -3,6 +3,11 @@
 # It checks the working tree, not the exact commits being pushed.
 set -e
 
+if [ ! -x ./node_modules/.bin/oxfmt ] || [ ! -x ./node_modules/.bin/oxlint ]; then
+	echo "pre-push: oxfmt or oxlint is missing. Run pnpm install, then push again." >&2
+	exit 1
+fi
+
 if ! ./node_modules/.bin/oxfmt --check >/dev/null 2>&1; then
 	./node_modules/.bin/oxfmt >/dev/null
 	echo "pre-push: oxfmt reformatted some files. Commit them, then push again." >&2
