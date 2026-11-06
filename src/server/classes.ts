@@ -38,12 +38,14 @@ async function roleIn(conn: typeof db | Tx, classId: ClassId, userId: UserId) {
 
 // Changes that depend on who teaches take this lock first. They then run one at a time per class,
 // and every read after it sees the changes that committed while it waited.
+// "no key update", not "update": it still blocks other lockClass calls, but not the foreign-key
+// check of an accept inserting a member. "update" deadlocks an accept against a parallel invite().
 async function lockClass(tx: Tx, classId: ClassId) {
 	const [locked] = await tx
 		.select({ id: classTable.id })
 		.from(classTable)
 		.where(eq(classTable.id, classId))
-		.for("update");
+		.for("no key update");
 	return locked !== undefined;
 }
 

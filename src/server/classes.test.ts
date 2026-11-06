@@ -213,6 +213,28 @@ describe("invites", () => {
 		expect(await listMyPendingInvites(siswa)).toEqual([]);
 	});
 
+	it("a new invite sent while the old one is being accepted doesn't fail either request", async () => {
+		const guru = await makeUser("guru");
+		const runs = await Promise.all(
+			Array.from({ length: 8 }, async (_, i) => {
+				const siswa = await makeUser(`siswa_${i}`);
+				const classId = await makeClass(guru, `Kelas ${i}`);
+				const inviteId = await inviteOk(guru, classId, `siswa_${i}`);
+				const [accepted, again] = await Promise.all([
+					acceptInvite(siswa, inviteId),
+					invite(guru, classId, InviteInput.assert({ username: `siswa_${i}` })),
+				]);
+				const members = await listMembers(guru, classId);
+				return { accepted, again, members: members.ok ? members.members.length : 0 };
+			}),
+		);
+		for (const { accepted, again, members } of runs) {
+			expect(accepted.ok).toBe(true);
+			expect(again.ok || again.reason === "already_member").toBe(true);
+			expect(members).toBe(2);
+		}
+	});
+
 	it("pending to declined: the invitee does not join, and declining again is a no-op", async () => {
 		const guru = await makeUser("guru");
 		const siswa = await makeUser("siswa");
