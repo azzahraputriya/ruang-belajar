@@ -5,14 +5,13 @@ import { type } from "arktype";
 import { describe, expect, it } from "vitest";
 import { classInvite } from "#/db/class-schema";
 import { db } from "#/db/client";
-import { ClassId, InviteId, UserId } from "#/db/ids";
-import { signUp } from "#/server/auth";
+import { ClassId, InviteId } from "#/db/ids";
+import { classWithStudent, inviteOk, makeClass, makeUser } from "#/test/fixtures";
 import {
 	CreateClassInput,
 	InviteInput,
 	acceptInvite,
 	changeRole,
-	createClass,
 	declineInvite,
 	getClass,
 	invite,
@@ -23,36 +22,6 @@ import {
 	removeMember,
 	revokeInvite,
 } from "#/server/classes";
-
-async function makeUser(username: string) {
-	const { response } = await signUp({ username, name: username, password: "rahasia-123" });
-	return UserId.assert(response.user.id);
-}
-
-async function makeClass(teacher: UserId, title = "Fisika X-1") {
-	const result = await createClass(teacher, CreateClassInput.assert({ title, subject: "Fisika" }));
-	return result.class.id;
-}
-
-async function inviteOk(teacher: UserId, classId: ClassId, username: string, role?: "teacher") {
-	const result = await invite(
-		teacher,
-		classId,
-		InviteInput.assert({ username, ...(role && { role }) }),
-	);
-	if (!result.ok) throw new Error(`invite failed: ${result.reason}`);
-	return result.inviteId;
-}
-
-// A teacher, a student who joined by invite, and an outsider.
-async function classWithStudent() {
-	const guru = await makeUser("guru");
-	const siswa = await makeUser("siswa");
-	const orang = await makeUser("orang");
-	const classId = await makeClass(guru);
-	await acceptInvite(siswa, await inviteOk(guru, classId, "siswa"));
-	return { guru, siswa, orang, classId };
-}
 
 const missingClass = () => ClassId.assert(randomUUID());
 const missingInvite = () => InviteId.assert(randomUUID());

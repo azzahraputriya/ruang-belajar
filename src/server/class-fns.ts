@@ -1,4 +1,4 @@
-// Owns: the server functions the class screens call, which find the signed-in user and parse input, plus the last-opened-class cookie. Not here: the class rules themselves (src/server/classes.ts).
+// Owns: the server functions the class screens call, which find the signed-in user and parse input, plus the last-opened-class cookie and requireActor, which module-fns.ts shares. Not here: the class rules themselves (src/server/classes.ts).
 
 import { createServerFn } from "@tanstack/react-start";
 import { getCookie, getRequest, setCookie } from "@tanstack/react-start/server";
@@ -25,7 +25,7 @@ import {
 } from "#/server/classes";
 
 // Screens that call these sit behind sign-in, so a missing session is a bug, not an expected result.
-async function requireActor() {
+export async function requireActor() {
 	const session = await auth.api.getSession({ headers: getRequest().headers });
 	if (!session) throw new Error("Not signed in");
 	return UserId.assert(session.user.id);
