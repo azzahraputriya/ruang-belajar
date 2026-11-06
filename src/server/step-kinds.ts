@@ -43,8 +43,8 @@ type QuizContent = typeof QuizContent.infer;
 
 // Where one student stands on a quiz. The best attempt counts, and a pass closes the quiz:
 // no more attempts after it, because a pass also reveals the solutions.
-// Both settings are read live, so a teacher raising maxAttempts reopens a quiz that ran out,
-// even if its solutions were already shown.
+// Both settings are read live, so a teacher raising maxAttempts reopens a quiz that ran out.
+// That is safe because running out never reveals the solutions.
 export function quizProgress({ maxAttempts, passScore }: QuizContent, scores: readonly number[]) {
 	const passed = scores.some((score) => score >= passScore);
 	const attemptsLeft = passed ? 0 : Math.max(0, maxAttempts - scores.length);

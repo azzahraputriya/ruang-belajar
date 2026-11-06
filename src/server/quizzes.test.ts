@@ -206,7 +206,8 @@ describe("quiz status", () => {
 
 	it("a teacher raising max attempts reopens a quiz that ran out", async () => {
 		const { siswa, guru, classId, stepId, answers } = await classWithQuiz({ maxAttempts: 1 });
-		await submitOk(siswa, stepId, answers.bothWrong);
+		// Running out reveals nothing, so the retry below is still a fair test.
+		expect(await submitOk(siswa, stepId, answers.bothWrong)).toMatchObject({ reveal: null });
 		expect(await statusOf(siswa, classId, stepId)).toBe("needs_help");
 		await updateStep(guru, stepId, quizInput({ maxAttempts: 2 }));
 		expect(await statusOf(siswa, classId, stepId)).toBe("in_progress");
@@ -402,7 +403,7 @@ describe("answer keys stay on the server", () => {
 		expect(await seen(quizA)).toBe(await seen(quizB));
 	});
 
-	it("the markers are visible to the teacher, and to the student once attempts run out", async () => {
+	it("the markers are visible to the teacher, but not to a student who ran out of attempts", async () => {
 		const { guru, siswa, classId } = await classWithStudent();
 		const { stepId, ids } = await quizWithMarkers(guru, classId, "a");
 		expect(leaked(await teacherQuiz(guru, stepId))).toEqual(markerStrings);
@@ -411,23 +412,11 @@ describe("answer keys stay on the server", () => {
 		await submitOk(siswa, stepId, wrong);
 		await submitOk(siswa, stepId, wrong);
 		const last = await submitOk(siswa, stepId, wrong);
-		expect(leaked(last)).toEqual(markerStrings);
+		expect(last).toMatchObject({ reveal: null });
+		expect(leaked(last)).toEqual([]);
 		const quiz = await getQuiz(siswa, stepId);
-		expect(leaked(quiz)).toEqual(markerStrings);
-		expect(quiz).toMatchObject({
-			ok: true,
-			reveal: [
-				{
-					questionId: ids[0],
-					correct: { value: MARKERS.numberValue, tolerance: MARKERS.tolerance },
-					feedback: MARKERS.feedback,
-					solution: MARKERS.solution,
-				},
-				{ questionId: ids[1], correct: MARKERS.shortText },
-				{ questionId: ids[2], correct: "a" },
-				{ questionId: ids[3], correct: ["a", "c"] },
-			],
-		});
+		expect(quiz).toMatchObject({ ok: true, attemptsLeft: 0, reveal: null });
+		expect(leaked(quiz)).toEqual([]);
 	});
 
 	it("a pass also reveals the solutions", async () => {

@@ -77,8 +77,9 @@ const questionsWithKeys = (conn: Conn, stepId: StepId) =>
 		.where(eq(question.stepId, stepId))
 		.orderBy(asc(question.position));
 
-// The correct answer, feedback, and solution of every question. Only for a quiz that is closed for
-// this student (passed, or out of attempts), so nothing they could still use to pass is shown early.
+// The correct answer, feedback, and solution of every question. Only after this student passes.
+// Running out of attempts doesn't reveal them: a teacher can raise maxAttempts, and the student
+// would retry with the answers in hand. Help after a failed quiz comes from the teacher or the tutor.
 async function revealFor(conn: Conn, stepId: StepId) {
 	const rows = await questionsWithKeys(conn, stepId);
 	return rows.map(({ question: q, key }) => ({
@@ -265,7 +266,7 @@ const attemptsOf = (conn: Conn, stepId: StepId, studentId: UserId) =>
 		.orderBy(asc(quizAttempt.attemptNumber));
 
 // The quiz as the acting student sees it: questions without keys, their own attempts, and the
-// solutions only once the quiz is closed for them. Teachers use teacherQuiz instead.
+// solutions only after they pass. Teachers use teacherQuiz instead.
 export async function getQuiz(actor: UserId, stepId: StepId) {
 	const access = await readQuiz(db, actor, stepId);
 	if (!access) return NOT_FOUND;
@@ -286,12 +287,12 @@ export async function getQuiz(actor: UserId, stepId: StepId) {
 		attempts,
 		passed: progress.passed,
 		attemptsLeft: progress.attemptsLeft,
-		reveal: progress.closed ? await revealFor(db, stepId) : null,
+		reveal: progress.passed ? await revealFor(db, stepId) : null,
 	} as const;
 }
 
 // Grades one attempt and stores it. Unanswered questions count as wrong. While attempts remain, the
-// result says only which questions were right; the reveal comes once the quiz closes.
+// result says only which questions were right; the reveal comes only with a pass.
 // Runs under the class lock, so two submits at once can't both take the same attempt number or go
 // past maxAttempts, and a teacher can't change the questions halfway through grading. The cost is
 // that submits in one class run one at a time, which is fine at this app's size.
@@ -354,7 +355,7 @@ export async function submitAttempt(actor: UserId, stepId: StepId, answers: Answ
 			results,
 			passed: after.passed,
 			attemptsLeft: after.attemptsLeft,
-			reveal: after.closed ? await revealFor(tx, stepId) : null,
+			reveal: after.passed ? await revealFor(tx, stepId) : null,
 		} as const;
 	});
 }
