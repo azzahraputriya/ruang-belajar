@@ -4,6 +4,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { getCookie, getRequest, setCookie } from "@tanstack/react-start/server";
 import { type } from "arktype";
 import { ClassId, InviteId, UserId } from "#/db/ids";
+import { env } from "#/env";
 import { auth } from "#/server/auth";
 import {
 	ClassRoleInput,
@@ -103,7 +104,7 @@ export const setLastClassFn = createServerFn({ method: "POST" })
 		setCookie(LAST_CLASS_COOKIE, data.classId, {
 			httpOnly: true,
 			sameSite: "lax",
-			secure: process.env.NODE_ENV === "production",
+			secure: env.BETTER_AUTH_URL.startsWith("https:"),
 			path: "/",
 			maxAge: 60 * 60 * 24 * 365,
 		});

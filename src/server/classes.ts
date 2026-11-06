@@ -23,7 +23,7 @@ export type InviteInput = typeof InviteInput.infer;
 type Fail<R extends string> = { ok: false; reason: R };
 const fail = <R extends string>(reason: R): Fail<R> => ({ ok: false, reason });
 // A missing class and a class you aren't in give this same value, so non-members learn nothing.
-const NOT_FOUND = fail("not_found");
+const NOT_FOUND = Object.freeze(fail("not_found"));
 const OK = { ok: true } as const;
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -36,10 +36,15 @@ async function roleIn(conn: typeof db | Tx, classId: ClassId, userId: UserId) {
 	return row?.role;
 }
 
-async function requireTeacher(classId: ClassId, actor: UserId) {
-	const role = await roleIn(db, classId, actor);
-	if (!role) return NOT_FOUND;
-	return role === "teacher" ? undefined : fail("forbidden");
+// Changes that depend on who teaches take this lock first. They then run one at a time per class,
+// and every read after it sees the changes that committed while it waited.
+async function lockClass(tx: Tx, classId: ClassId) {
+	const [locked] = await tx
+		.select({ id: classTable.id })
+		.from(classTable)
+		.where(eq(classTable.id, classId))
+		.for("update");
+	return locked !== undefined;
 }
 
 // The creator becomes the first teacher in the same transaction, so a class never exists without one.
@@ -108,23 +113,28 @@ export async function listMembers(actor: UserId, classId: ClassId) {
 	return { ok: true, members } as const;
 }
 
+// Locked like changeMember, so a teacher who is being demoted can't send one last invite.
 export async function invite(actor: UserId, classId: ClassId, input: InviteInput) {
-	const denied = await requireTeacher(classId, actor);
-	if (denied) return denied;
-	const [found] = await db
-		.select({ id: user.id })
-		.from(user)
-		.where(eq(user.username, input.username));
-	if (!found) return fail("user_not_found");
-	const inviteeId = UserId.assert(found.id);
-	if (await roleIn(db, classId, inviteeId)) return fail("already_member");
-	// The partial unique index allows one pending invite per class and user. A second insert hits it and adds nothing.
-	const [created] = await db
-		.insert(classInvite)
-		.values({ classId, inviteeId, invitedById: actor, role: input.role })
-		.onConflictDoNothing()
-		.returning({ id: classInvite.id });
-	return created ? ({ ok: true, inviteId: created.id } as const) : fail("already_invited");
+	return db.transaction(async (tx) => {
+		if (!(await lockClass(tx, classId))) return NOT_FOUND;
+		const role = await roleIn(tx, classId, actor);
+		if (!role) return NOT_FOUND;
+		if (role !== "teacher") return fail("forbidden");
+		const [found] = await tx
+			.select({ id: user.id })
+			.from(user)
+			.where(eq(user.username, input.username));
+		if (!found) return fail("user_not_found");
+		const inviteeId = UserId.assert(found.id);
+		if (await roleIn(tx, classId, inviteeId)) return fail("already_member");
+		// The partial unique index allows one pending invite per class and user. A second insert hits it and adds nothing.
+		const [created] = await tx
+			.insert(classInvite)
+			.values({ classId, inviteeId, invitedById: actor, role: input.role })
+			.onConflictDoNothing()
+			.returning({ id: classInvite.id });
+		return created ? ({ ok: true, inviteId: created.id } as const) : fail("already_invited");
+	});
 }
 
 // Locks the invite row, so an accept and a revoke at the same moment can't both win.
@@ -147,9 +157,12 @@ async function moveInvite(actor: UserId, inviteId: InviteId, action: InviteActio
 			.set({ status: decision.to, respondedAt: new Date() })
 			.where(eq(classInvite.id, inviteId));
 		if (action === "accept") {
+			// The invitee can already be a member: invite() can run while an earlier invite's accept commits.
+			// Accepting then just closes the extra invite and keeps the existing role.
 			await tx
 				.insert(classMember)
-				.values({ classId: found.classId, userId: actor, role: found.role });
+				.values({ classId: found.classId, userId: actor, role: found.role })
+				.onConflictDoNothing();
 		}
 		return done;
 	});
@@ -173,13 +186,8 @@ async function changeMember(
 	// Anyone can leave. Everything else is a teacher's job, including changing your own role.
 	const needsTeacher = change !== "remove" || targetId !== actor;
 	return db.transaction(async (tx) => {
-		// Lock first. Two teachers demoting each other then run one after the other, and the reads below see the first one's change.
-		const [locked] = await tx
-			.select({ id: classTable.id })
-			.from(classTable)
-			.where(eq(classTable.id, classId))
-			.for("update");
-		if (!locked) return NOT_FOUND;
+		// Without the lock, the only two teachers could each demote themselves, both counting two teachers.
+		if (!(await lockClass(tx, classId))) return NOT_FOUND;
 		const actorRole = await roleIn(tx, classId, actor);
 		if (!actorRole) return NOT_FOUND;
 		if (needsTeacher && actorRole !== "teacher") return fail("forbidden");

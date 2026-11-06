@@ -3,6 +3,8 @@
 import { randomUUID } from "node:crypto";
 import { type } from "arktype";
 import { describe, expect, it } from "vitest";
+import { classInvite } from "#/db/class-schema";
+import { db } from "#/db/client";
 import { ClassId, InviteId, UserId } from "#/db/ids";
 import { signUp } from "#/server/auth";
 import {
@@ -196,6 +198,19 @@ describe("invites", () => {
 		expect(await removeMember(guru, classId, siswa)).toEqual({ ok: true });
 		expect((await acceptInvite(siswa, inviteId)).ok).toBe(true);
 		expect(await getClass(siswa, classId)).toEqual({ ok: false, reason: "not_found" });
+	});
+
+	// invite() racing an earlier accept can leave a member with a pending invite. Built directly here.
+	it("accepting an extra invite as a member closes it and keeps the role", async () => {
+		const { guru, siswa, classId } = await classWithStudent();
+		const [extra] = await db
+			.insert(classInvite)
+			.values({ classId, inviteeId: siswa, invitedById: guru, role: "teacher" })
+			.returning({ id: classInvite.id });
+		if (!extra) throw new Error("insert returned no row");
+		expect(await acceptInvite(siswa, extra.id)).toEqual({ ok: true, classId, status: "accepted" });
+		expect(await getClass(siswa, classId)).toMatchObject({ class: { myRole: "student" } });
+		expect(await listMyPendingInvites(siswa)).toEqual([]);
 	});
 
 	it("pending to declined: the invitee does not join, and declining again is a no-op", async () => {
