@@ -124,6 +124,10 @@ describe("input rules", () => {
 			dueAt: null,
 		});
 		expect(ModuleInput({ title: "  " })).toBeInstanceOf(type.errors);
+		expect(ModuleInput({ title: "Bab 1", opensAt: later(), dueAt: earlier() })).toBeInstanceOf(
+			type.errors,
+		);
+		expect(ModuleInput({ title: "Bab 1", dueAt: earlier() })).not.toBeInstanceOf(type.errors);
 		expect(StepInput({ kind: "reading", title: "", content: { body: "" } })).toBeInstanceOf(
 			type.errors,
 		);
@@ -385,6 +389,14 @@ describe("order", () => {
 		]);
 		expect(results).toEqual(results.map(() => mismatch));
 		expect(await moduleTitles(guru, classId)).toEqual(before);
+	});
+
+	it("accepts uppercase ids in a reorder", async () => {
+		const { guru, classId, moduleId } = await classWithStep();
+		const second = await moduleOk(guru, classId, "Bab 2");
+		const upper = [second, moduleId].map((id) => ModuleId.assert(id.toUpperCase()));
+		expect(await reorderModules(guru, classId, upper)).toEqual({ ok: true });
+		expect((await moduleTitles(guru, classId)).map((m) => m.title)).toEqual(["Bab 2", "Bab 1"]);
 	});
 
 	it("refuses a step from another module in a step reorder", async () => {

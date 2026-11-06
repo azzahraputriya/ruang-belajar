@@ -66,5 +66,9 @@ export const stepVisit = pgTable(
 		event: visitEvent("event").notNull(),
 		at: timestamp("at").defaultNow().notNull(),
 	},
-	(t) => [index("step_visit_step_student_idx").on(t.stepId, t.studentId)],
+	(t) => [
+		index("step_visit_step_student_idx").on(t.stepId, t.studentId),
+		// Deleting a user cascades here by student_id.
+		index("step_visit_student_id_idx").on(t.studentId),
+	],
 );

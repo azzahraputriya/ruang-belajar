@@ -14,7 +14,7 @@ import {
 } from "#/db/content-schema";
 import { db } from "#/db/client";
 import type { ClassId, ModuleId, StepId, UserId } from "#/db/ids";
-import { type Conn, NOT_FOUND, OK, fail, lockClass, roleIn } from "#/server/class-access";
+import { type Conn, NOT_FOUND, OK, type Tx, fail, lockClass, roleIn } from "#/server/class-access";
 import { STEP_KINDS, parseStepContent, stepStatus } from "#/server/step-kinds";
 
 const Title = type("string.trim").to("1 <= string <= 200");
@@ -24,7 +24,13 @@ export const ModuleInput = type({
 	title: Title,
 	opensAt: type("Date | null").default(null),
 	dueAt: type("Date | null").default(null),
-});
+}).narrow(
+	({ opensAt, dueAt }, ctx) =>
+		!opensAt ||
+		!dueAt ||
+		dueAt >= opensAt ||
+		ctx.reject({ path: ["dueAt"], expected: "on or after opensAt" }),
+);
 export type ModuleInput = typeof ModuleInput.infer;
 
 export const StepKindInput = type.enumerated(...stepKind.enumValues);
@@ -46,10 +52,9 @@ const visibleTo = (role: ClassRole, opensAt: Date | null, now = new Date()) =>
 	role === "teacher" || opensAt === null || opensAt <= now;
 
 // The module and the actor's role in its class. Undefined when the actor shouldn't learn the module
-// exists: not a member, or a student before it opens. `lock` holds the row until the transaction ends,
-// so step positions inside it change one writer at a time.
-async function moduleFor(conn: Conn, actor: UserId, moduleId: ModuleId, lock = false) {
-	const query = conn
+// exists: not a member, or a student before it opens.
+async function moduleFor(conn: Conn, actor: UserId, moduleId: ModuleId) {
+	const [found] = await conn
 		.select({
 			classId: moduleTable.classId,
 			opensAt: moduleTable.opensAt,
@@ -57,11 +62,37 @@ async function moduleFor(conn: Conn, actor: UserId, moduleId: ModuleId, lock = f
 		})
 		.from(moduleTable)
 		.where(eq(moduleTable.id, moduleId));
-	const [found] = lock ? await query.for("no key update") : await query;
 	if (!found) return undefined;
 	const role = await roleIn(conn, found.classId, actor);
 	if (!role || !visibleTo(role, found.opensAt)) return undefined;
 	return { ...found, role };
+}
+
+// Every write to a module or its steps starts here. It takes the class lock, then checks the actor
+// teaches the class. One lock per class keeps positions changing one writer at a time, and a teacher
+// being demoted at the same moment can't get one last edit in.
+async function writeModule(tx: Tx, actor: UserId, moduleId: ModuleId) {
+	const [found] = await tx
+		.select({ classId: moduleTable.classId })
+		.from(moduleTable)
+		.where(eq(moduleTable.id, moduleId));
+	if (!found || !(await lockClass(tx, found.classId))) return NOT_FOUND;
+	// Read again under the lock: the module may have moved or gone while we waited.
+	const access = await moduleFor(tx, actor, moduleId);
+	if (!access) return NOT_FOUND;
+	if (access.role !== "teacher") return fail("forbidden");
+	return { ok: true, ...access } as const;
+}
+
+// writeModule for the module that holds this step.
+async function writeStep(tx: Tx, actor: UserId, stepId: StepId) {
+	const [found] = await tx
+		.select({ moduleId: step.moduleId })
+		.from(step)
+		.where(eq(step.id, stepId));
+	if (!found) return NOT_FOUND;
+	const access = await writeModule(tx, actor, found.moduleId);
+	return access.ok ? { ...access, moduleId: found.moduleId } : access;
 }
 
 // Same as moduleFor, for the step's module, along with the step row.
@@ -89,13 +120,15 @@ function toStep(row: typeof step.$inferSelect) {
 }
 export type Step = ReturnType<typeof toStep>;
 
-// The ordered list must be exactly the current ids, each once.
-function sameIds<T>(current: readonly T[], ordered: readonly T[]) {
-	const have = new Set(current);
+// The ordered list must be exactly the current ids, each once. Postgres returns uuids in lowercase,
+// and an uppercase uuid is still valid input, so both sides are lowercased before comparing.
+function sameIds(current: readonly string[], ordered: readonly string[]) {
+	const have = new Set(current.map((id) => id.toLowerCase()));
+	const want = ordered.map((id) => id.toLowerCase());
 	return (
-		ordered.length === current.length &&
-		new Set(ordered).size === ordered.length &&
-		ordered.every((id) => have.has(id))
+		want.length === have.size &&
+		new Set(want).size === want.length &&
+		want.every((id) => have.has(id))
 	);
 }
 
@@ -127,28 +160,23 @@ export async function createModule(actor: UserId, classId: ClassId, input: Modul
 }
 
 export async function updateModule(actor: UserId, moduleId: ModuleId, input: ModuleInput) {
-	const access = await moduleFor(db, actor, moduleId);
-	if (!access) return NOT_FOUND;
-	if (access.role !== "teacher") return fail("forbidden");
-	const [updated] = await db
-		.update(moduleTable)
-		.set(input)
-		.where(eq(moduleTable.id, moduleId))
-		.returning();
-	return updated ? ({ ok: true, module: updated } as const) : NOT_FOUND;
+	return db.transaction(async (tx) => {
+		const access = await writeModule(tx, actor, moduleId);
+		if (!access.ok) return access;
+		const [updated] = await tx
+			.update(moduleTable)
+			.set(input)
+			.where(eq(moduleTable.id, moduleId))
+			.returning();
+		if (!updated) throw new Error("Updating a locked module returned no row");
+		return { ok: true, module: updated } as const;
+	});
 }
 
 export async function deleteModule(actor: UserId, moduleId: ModuleId) {
 	return db.transaction(async (tx) => {
-		const [found] = await tx
-			.select({ classId: moduleTable.classId })
-			.from(moduleTable)
-			.where(eq(moduleTable.id, moduleId));
-		if (!found || !(await lockClass(tx, found.classId))) return NOT_FOUND;
-		// Read again under the lock: a reorder may have moved it while we waited.
-		const access = await moduleFor(tx, actor, moduleId);
-		if (!access) return NOT_FOUND;
-		if (access.role !== "teacher") return fail("forbidden");
+		const access = await writeModule(tx, actor, moduleId);
+		if (!access.ok) return access;
 		await tx.delete(moduleTable).where(eq(moduleTable.id, moduleId));
 		await tx
 			.update(moduleTable)
@@ -188,9 +216,8 @@ export async function reorderModules(actor: UserId, classId: ClassId, orderedIds
 
 export async function createStep(actor: UserId, moduleId: ModuleId, input: StepInput) {
 	return db.transaction(async (tx) => {
-		const access = await moduleFor(tx, actor, moduleId, true);
-		if (!access) return NOT_FOUND;
-		if (access.role !== "teacher") return fail("forbidden");
+		const access = await writeModule(tx, actor, moduleId);
+		if (!access.ok) return access;
 		const [created] = await tx
 			.insert(step)
 			.values({
@@ -206,47 +233,39 @@ export async function createStep(actor: UserId, moduleId: ModuleId, input: StepI
 
 // A step keeps its kind. Students' visits and, later, their attempts belong to that kind.
 export async function updateStep(actor: UserId, stepId: StepId, input: StepInput) {
-	const access = await stepFor(db, actor, stepId);
-	if (!access) return NOT_FOUND;
-	if (access.role !== "teacher") return fail("forbidden");
-	if (access.step.kind !== input.kind) return fail("kind_changed");
-	const [updated] = await db
-		.update(step)
-		.set({ title: input.title, content: input.content })
-		.where(eq(step.id, stepId))
-		.returning();
-	return updated ? ({ ok: true, step: toStep(updated) } as const) : NOT_FOUND;
+	return db.transaction(async (tx) => {
+		const access = await writeStep(tx, actor, stepId);
+		if (!access.ok) return access;
+		const [updated] = await tx
+			.update(step)
+			.set({ title: input.title, content: input.content })
+			.where(and(eq(step.id, stepId), eq(step.kind, input.kind)))
+			.returning();
+		return updated ? ({ ok: true, step: toStep(updated) } as const) : fail("kind_changed");
+	});
 }
 
 export async function deleteStep(actor: UserId, stepId: StepId) {
 	return db.transaction(async (tx) => {
-		const [found] = await tx
-			.select({ moduleId: step.moduleId })
-			.from(step)
-			.where(eq(step.id, stepId));
-		if (!found) return NOT_FOUND;
-		const access = await moduleFor(tx, actor, found.moduleId, true);
-		if (!access) return NOT_FOUND;
-		if (access.role !== "teacher") return fail("forbidden");
-		// The position comes from the delete itself, read under the lock, so a reorder that ran while we waited is already in it.
+		const access = await writeStep(tx, actor, stepId);
+		if (!access.ok) return access;
 		const [deleted] = await tx
 			.delete(step)
 			.where(eq(step.id, stepId))
 			.returning({ position: step.position });
-		if (!deleted) return NOT_FOUND;
+		if (!deleted) throw new Error("Deleting a locked step returned no row");
 		await tx
 			.update(step)
 			.set({ position: sql`${step.position} - 1` })
-			.where(and(eq(step.moduleId, found.moduleId), gt(step.position, deleted.position)));
+			.where(and(eq(step.moduleId, access.moduleId), gt(step.position, deleted.position)));
 		return OK;
 	});
 }
 
 export async function reorderSteps(actor: UserId, moduleId: ModuleId, orderedIds: StepId[]) {
 	return db.transaction(async (tx) => {
-		const access = await moduleFor(tx, actor, moduleId, true);
-		if (!access) return NOT_FOUND;
-		if (access.role !== "teacher") return fail("forbidden");
+		const access = await writeModule(tx, actor, moduleId);
+		if (!access.ok) return access;
 		const current = await tx.select({ id: step.id }).from(step).where(eq(step.moduleId, moduleId));
 		if (
 			!sameIds(

@@ -1,5 +1,5 @@
 {
-	"id": "0a83236f-09e8-42d6-a379-46a435ebf6fe",
+	"id": "132fc465-0538-4e8f-8c1a-7f26809bfb1d",
 	"prevId": "115f398a-1721-4947-943c-77a1743b4bd0",
 	"version": "7",
 	"dialect": "postgresql",
@@ -842,6 +842,21 @@
 							"asc": true,
 							"nulls": "last"
 						},
+						{
+							"expression": "student_id",
+							"isExpression": false,
+							"asc": true,
+							"nulls": "last"
+						}
+					],
+					"isUnique": false,
+					"concurrently": false,
+					"method": "btree",
+					"with": {}
+				},
+				"step_visit_student_id_idx": {
+					"name": "step_visit_student_id_idx",
+					"columns": [
 						{
 							"expression": "student_id",
 							"isExpression": false,

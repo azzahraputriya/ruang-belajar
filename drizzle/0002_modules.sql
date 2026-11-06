@@ -34,4 +34,5 @@ ALTER TABLE "step_visit" ADD CONSTRAINT "step_visit_step_id_step_id_fk" FOREIGN 
 ALTER TABLE "step_visit" ADD CONSTRAINT "step_visit_student_id_user_id_fk" FOREIGN KEY ("student_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 CREATE INDEX "module_class_id_idx" ON "module" USING btree ("class_id");--> statement-breakpoint
 CREATE INDEX "step_module_id_idx" ON "step" USING btree ("module_id");--> statement-breakpoint
-CREATE INDEX "step_visit_step_student_idx" ON "step_visit" USING btree ("step_id","student_id");
+CREATE INDEX "step_visit_step_student_idx" ON "step_visit" USING btree ("step_id","student_id");--> statement-breakpoint
+CREATE INDEX "step_visit_student_id_idx" ON "step_visit" USING btree ("student_id");
