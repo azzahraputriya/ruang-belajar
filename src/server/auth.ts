@@ -11,9 +11,10 @@ import * as schema from "#/db/schema";
 import { env } from "#/env";
 
 // Accepts any case and stores lowercase, so "Budi" and "budi" are the same account.
+// No dot at either end and no two dots in a row: the username becomes the placeholder email's local part.
 const Username = type("string.lower")
-	.to(/^[a-z0-9_.]{3,30}$/)
-	.describe("3 to 30 letters, digits, _ or .");
+	.to(/^(?!.*\.\.)[a-z0-9_][a-z0-9_.]{1,28}[a-z0-9_]$/)
+	.describe("3 to 30 letters, digits, _ or ., not starting or ending with a dot");
 
 const Name = type("string.trim").to("1 <= string <= 80");
 const PASSWORD = { min: 8, max: 128 };
