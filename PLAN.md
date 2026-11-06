@@ -6,17 +6,17 @@ This file is the roadmap. To pick up work, take the first phase that is `in prog
 
 ## Status
 
-| Phase                           | Status                                         | PRs                         |
-| ------------------------------- | ---------------------------------------------- | --------------------------- |
-| 0. Repo setup                   | in review                                      | #1, #2, #3 (merge in order) |
-| 1. Accounts                     | not started                                    |                             |
-| 2. Deploy                       | not started, blocked on open decisions 1 and 2 |                             |
-| 3. Classes and invites          | not started                                    |                             |
-| 4. Content: modules and steps   | not started                                    |                             |
-| 5. Quizzes                      | not started                                    |                             |
-| 6. Assignments and grading      | not started                                    |                             |
-| 7. Discussion and announcements | not started                                    |                             |
-| 8. AI tutor                     | not started, blocked on open decision 3        |                             |
+| Phase                           | Status      | PRs                         |
+| ------------------------------- | ----------- | --------------------------- |
+| 0. Repo setup                   | in review   | #1, #2, #3 (merge in order) |
+| 1. Accounts                     | not started |                             |
+| 2. Deploy                       | not started |                             |
+| 3. Classes and invites          | not started |                             |
+| 4. Content: modules and steps   | not started |                             |
+| 5. Quizzes                      | not started |                             |
+| 6. Assignments and grading      | not started |                             |
+| 7. Discussion and announcements | not started |                             |
+| 8. AI tutor                     | not started |                             |
 
 Phases 1 to 8 each end in a working, tested slice. Phase 2 can run alongside phase 3.
 
@@ -41,10 +41,11 @@ Done when: a test against a real Postgres signs up, signs in, reads the session,
 Run the app on the VPS for real users.
 
 - Production build in a container, as a non-root user, next to the Postgres container.
-- Public access through a Cloudflare Tunnel (`cloudflared` is already installed), so no ports are opened.
-- Nightly `pg_dump` backup, with a tested restore.
+- Public at `lms.afiefabd.com`. The domain is already on Cloudflare, and this VPS already runs a Cloudflare Tunnel for another hostname. Add an ingress rule to that tunnel instead of creating a second one, so no ports are opened.
+- That tunnel also carries remote access to this machine. Keep its existing rules, run `cloudflared tunnel ingress validate` before restarting it, and confirm the old hostname still works afterwards. Get Afief's go-ahead before the restart.
+- No backups (Afief's call). Keep the Postgres data in a named Docker volume so restarts and rebuilds don't lose it.
 
-Done when: the public URL serves the app over HTTPS, and a restore from last night's backup brings back a test account.
+Done when: `https://lms.afiefabd.com` serves the app, a test account survives a container rebuild, and the tunnel's other hostname still works.
 
 ### 3. Classes and invites
 
@@ -85,8 +86,8 @@ Done when: a discussion step counts as done after the required posts and replies
 
 After a wrong quiz answer, the student can open a tutor chat about that question.
 
-- Only when the class has the tutor on and the student has agreed (`aiTutorEnabled`, `aiConsentAt`).
-- Claude Haiku 5.5 through the Anthropic SDK. Start from the tested tutor prompt in `../mspd/a6/lampiran/tutor-v2.md`, made subject-neutral.
+- Only when the class has the tutor on and the student has agreed (`aiTutorEnabled`, `aiConsentAt`). The consent text says what is sent, to whom, and why. Afief approves the wording before release.
+- Claude Haiku 5.5 through the Anthropic SDK, billed to Afief's personal Anthropic account. The API key lives only in the VPS environment, never in the repo. Start from the tested tutor prompt in `../mspd/a6/lampiran/tutor-v2.md`, made subject-neutral.
 - Never send the student's name. While attempts remain, never reveal the answer.
 - Store each message with its token counts, enforce a daily cap per student, and let teachers read the chats.
 
@@ -94,7 +95,7 @@ Done when: replays of the `../mspd/a6` test students pass (no early answer, no m
 
 ## Decisions
 
-Settled, with the reason:
+Settled by Afief, with the reason where it isn't obvious:
 
 - **One VPS for everything.** Usage will be near zero. Measured: the app server uses 62 to 155 MB of RAM, and Postgres 38 to 46 MB.
 - **Postgres in one container, no Redis.** Sessions and the AI daily cap fit in Postgres.
@@ -102,20 +103,17 @@ Settled, with the reason:
 - **Username and password login.** No password reset in the first version.
 - **Libraries.** Drizzle, better-auth, ArkType. See `docs/data-model.md`.
 - **UI.** shadcn/ui components. Any new screen gets design mocks before it is built.
-- **The AI model is hosted.** A local model is not realistic on 4 CPU cores with no GPU.
-
-Assumed by an agent, not yet confirmed by Afief:
-
-- The UI is in Bahasa Indonesia. The original design used Indonesian copy.
-- Tests use Vitest, with database tests against a real Postgres container.
-- Data fetching uses TanStack Start server functions with TanStack Query.
+- **The AI model is hosted.** A local model is not realistic on 4 CPU cores with no GPU. Afief's personal Anthropic account pays. Estimated cost is about Rp11 per tutor reply on Haiku 5.5, assuming about 4.000 tokens in and 500 out per reply and about Rp16.500 per USD.
+- **The UI is in Bahasa Indonesia.**
+- **Tests use Vitest,** with database tests against a real Postgres container.
+- **Data fetching uses TanStack Start server functions with TanStack Query.**
+- **Domain.** Probably `lms.afiefabd.com`. Confirm with Afief before adding the DNS record.
+- **No backups for now.** Accepted risk: if the VPS disk or the Postgres volume is lost, all accounts and class data are lost.
+- **Consent.** The tutor sends student work to an outside AI service, which counts as personal data under UU PDP (Law No. 27/2022). Afief approves the consent text and its stated purpose.
 
 ## Open decisions
 
-1. **Domain.** Which domain, and whose Cloudflare account runs the tunnel? Blocks phase 2.
-2. **Backups.** Where do backups go? Only on the same VPS, or copied elsewhere too? Blocks phase 2.
-3. **AI billing.** Whose Anthropic account pays for the tutor? Estimated cost is about Rp11 per tutor reply on Haiku 5.5, assuming about 4.000 tokens in and 500 out per reply and about Rp16.500 per USD. Blocks phase 8.
-4. **Consent wording.** The tutor sends student work to an outside AI service, which counts as personal data under UU PDP (Law No. 27/2022). The consent text and its purpose need a person's approval before phase 8 ships.
+None right now. Add any new question here with the phase it blocks.
 
 ## Constraints
 
