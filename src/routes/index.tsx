@@ -1,4 +1,4 @@
-// Owns: the home page at "/". Starter placeholder until the class switcher replaces it.
+// Owns: the home page at "/". Placeholder until the class switcher replaces it in phase 3.
 
 import { createFileRoute } from "@tanstack/react-router";
 
@@ -6,11 +6,9 @@ export const Route = createFileRoute("/")({ component: Home });
 
 function Home() {
 	return (
-		<div className="p-8">
-			<h1 className="text-4xl font-bold">Welcome to TanStack Start</h1>
-			<p className="mt-4 text-lg">
-				Edit <code>src/routes/index.tsx</code> to get started.
-			</p>
-		</div>
+		<main className="mx-auto flex min-h-svh max-w-md flex-col justify-center gap-4 p-6">
+			<h1 className="text-2xl font-semibold tracking-tight">Ruang Belajar</h1>
+			<p className="text-muted-foreground">Kelas, materi, dan tutor AI dalam satu tempat.</p>
+		</main>
 	);
 }

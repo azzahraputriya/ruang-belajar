@@ -26,6 +26,12 @@ Every file in `src/` opens with `// Owns: <what this file is for>. Not here: <wh
 - If it doesn't fit, put it in the file whose header covers it (`rg "^// Owns:" src` lists them all), or create a new file with its own header.
 - If a file's job really changes, update its header in the same edit.
 
+## UI
+
+- Components come from shadcn/ui (Radix base, Nova style, blue theme in `src/styles.css`). Add them with `pnpm ui:add <name>`, never `shadcn add` directly. The script fixes the imports and file headers the CLI gets wrong here.
+- Generated components live in `src/components/ui/`. Wrap them in `src/components/` instead of editing them.
+- To check a change in a real browser, use the `verify` skill (`.claude/skills/verify/SKILL.md`).
+
 ## Generated files
 
 `src/routeTree.gen.ts` is rebuilt from `src/routes/` on every `pnpm dev` and `pnpm build`. Never edit it. Change the route files instead.
