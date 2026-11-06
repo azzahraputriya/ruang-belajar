@@ -1,0 +1,36 @@
+# The live app and its own Postgres. A separate project from docker-compose.yml, so it never shares the dev database.
+# Both services read .env.production directly. Compose fills ${...} from .env, which is the dev file, so this file uses none.
+name: ruang-belajar-prod
+
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    # Passes stop signals to node, so restarts don't wait for the 10 second kill.
+    init: true
+    env_file: .env.production
+    # Localhost only. The Cloudflare Tunnel is the only way in from outside.
+    ports:
+      - "127.0.0.1:3300:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    env_file: .env.production
+    environment:
+      POSTGRES_USER: ruang
+      POSTGRES_DB: ruang
+    # No ports: only the app container can reach it.
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+
+volumes:
+  db-data:
