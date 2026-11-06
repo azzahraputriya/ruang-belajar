@@ -25,7 +25,7 @@ import {
 } from "#/server/classes";
 
 // Screens that call these sit behind sign-in, so a missing session is a bug, not an expected result.
-async function requireActor() {
+export async function requireActor() {
 	const session = await auth.api.getSession({ headers: getRequest().headers });
 	if (!session) throw new Error("Not signed in");
 	return UserId.assert(session.user.id);
