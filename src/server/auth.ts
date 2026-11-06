@@ -15,26 +15,52 @@ const Username = type("string.lower")
 	.to(/^[a-z0-9_.]{3,30}$/)
 	.describe("3 to 30 letters, digits, _ or .");
 
-export const SignUpInput = type({
-	username: Username,
-	name: type("string.trim").to("1 <= string <= 80"),
-	password: "8 <= string <= 128",
-});
+const Name = type("string.trim").to("1 <= string <= 80");
+const PASSWORD = { min: 8, max: 128 };
+
+const Password = type("string").atLeastLength(PASSWORD.min).atMostLength(PASSWORD.max);
+
+export const SignUpInput = type({ username: Username, name: Name, password: Password });
 export type SignUpInput = typeof SignUpInput.inferIn;
 
 // better-auth needs an email on every user. This one can never receive mail.
 export const emailForUsername = (name: string) => `${name}@users.ruang-belajar.invalid`;
 
-const SignUpBody = SignUpInput.and({ email: "string" });
+// Raw requests to the public auth route. Extra keys are refused, so nobody can set fields like `image` or `displayUsername`.
+// They must arrive already trimmed, because better-auth stores the raw body, not our parsed copy.
+const RawName = type("1 <= string <= 80").narrow(
+	(name, ctx) => name === name.trim() || ctx.mustBe("trimmed"),
+);
+const SignUpBody = type({
+	username: Username,
+	name: RawName,
+	password: Password,
+	email: "string",
+}).onUndeclaredKey("reject");
+const UpdateUserBody = type({ "name?": RawName }).onUndeclaredKey("reject");
+
+// The username is part of the placeholder email, so changing either would split them. Neither can change.
+const BLOCKED_PATHS = new Set(["/change-email", "/update-username"]);
 
 export const auth = betterAuth({
 	baseURL: env.BETTER_AUTH_URL,
 	secret: env.BETTER_AUTH_SECRET,
 	database: drizzleAdapter(db, { provider: "pg", schema }),
-	emailAndPassword: { enabled: true, minPasswordLength: 8, maxPasswordLength: 128 },
+	emailAndPassword: {
+		enabled: true,
+		minPasswordLength: PASSWORD.min,
+		maxPasswordLength: PASSWORD.max,
+	},
 	hooks: {
 		// The auth route is public, so a raw POST to /sign-up/email gets the same rules as signUp() below.
 		before: createAuthMiddleware(async (ctx) => {
+			if (BLOCKED_PATHS.has(ctx.path)) throw new APIError("FORBIDDEN");
+			if (ctx.path === "/update-user") {
+				const body = UpdateUserBody(ctx.body);
+				if (body instanceof type.errors)
+					throw new APIError("BAD_REQUEST", { message: body.summary });
+				return;
+			}
 			if (ctx.path !== "/sign-up/email") return;
 			const body = SignUpBody(ctx.body);
 			if (body instanceof type.errors) throw new APIError("BAD_REQUEST", { message: body.summary });

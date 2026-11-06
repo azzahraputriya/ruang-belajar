@@ -42,7 +42,7 @@ Every file in `src/` opens with `// Owns: <what this file is for>. Not here: <wh
 
 Always run `pnpm check` (lint and format), `pnpm typecheck`, and `pnpm test` (needs `docker compose up -d`). `pnpm format` fixes formatting. Then add:
 
-- `pnpm build` when you change routes, server code, or `vite.config.ts`. To try the result, run `node .output/server/index.mjs`.
+- `pnpm build` when you change routes, server code, or `vite.config.ts`. To try the result, run `node --env-file=.env .output/server/index.mjs`.
 - `pnpm lint:probes` when you change `.oxlintrc.json`. Also add a probe and a row in `docs/lint-rules.md` for each new rule.
 
 ## Lint errors that need project knowledge

@@ -83,5 +83,5 @@ jobs:
         with:
           node-version-file: .node-version
       - run: pnpm install --frozen-lockfile
-      - run: pnpm db:migrate
+      # Vitest's global setup applies the migrations.
       - run: pnpm test

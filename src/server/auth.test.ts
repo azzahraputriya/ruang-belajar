@@ -72,4 +72,25 @@ describe("accounts", () => {
 		expect(error instanceof APIError && error.message).not.toContain(budi.password);
 		await expect(signUp({ ...budi, username: "bu di" })).rejects.toThrow();
 	});
+
+	it("refuses raw sign-up fields signUp() never sends", async () => {
+		const email = emailForUsername("budi");
+		await expect(
+			auth.api.signUpEmail({ body: { ...budi, email, image: "https://evil.example/x.png" } }),
+		).rejects.toMatchObject({ statusCode: 400 });
+		await expect(
+			auth.api.signUpEmail({ body: { ...budi, email, name: "  Budi  " } }),
+		).rejects.toMatchObject({ statusCode: 400 });
+	});
+
+	it("keeps the username fixed, but lets the display name change", async () => {
+		const { headers } = await signUp(budi);
+		const browser = cookiesFrom(headers);
+		await expect(
+			auth.api.updateUser({ headers: browser, body: { username: "andi" } }),
+		).rejects.toMatchObject({ statusCode: 400 });
+		await auth.api.updateUser({ headers: browser, body: { name: "Budi S." } });
+		const session = await auth.api.getSession({ headers: browser });
+		expect(session?.user).toMatchObject({ username: "budi", name: "Budi S." });
+	});
 });

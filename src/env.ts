@@ -8,4 +8,9 @@ const Env = type({
 	BETTER_AUTH_URL: "string.url",
 });
 
-export const env = Env.assert(process.env);
+const parsed = Env(process.env);
+// Names only, never values: a malformed DATABASE_URL can still contain the password.
+if (parsed instanceof type.errors) {
+	throw new Error(`Missing or invalid env vars: ${parsed.map((e) => e.path.join(".")).join(", ")}`);
+}
+export const env = parsed;

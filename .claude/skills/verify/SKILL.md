@@ -15,10 +15,10 @@ First start Postgres and apply migrations: `docker compose up -d --wait`, then `
 
 ```sh
 PORT=$(node -e 'const s=require("net").createServer().listen(0,()=>{console.log(s.address().port);s.close()})')
-pnpm dev --port "$PORT"   # run in the background
+BETTER_AUTH_URL="http://localhost:$PORT" pnpm dev --port "$PORT"   # run in the background
 ```
 
-Wait until `curl -fsS -o /dev/null "http://localhost:$PORT/"` succeeds. If the change touches server code, routes, or `vite.config.ts`, also check the production build: `pnpm build`, then `PORT=$PORT node --env-file=.env .output/server/index.mjs`.
+Wait until `curl -fsS -o /dev/null "http://localhost:$PORT/"` succeeds. If the change touches server code, routes, or `vite.config.ts`, also check the production build: `pnpm build`, then `PORT=$PORT BETTER_AUTH_URL=http://localhost:$PORT node --env-file=.env .output/server/index.mjs`. better-auth refuses requests from any origin but `BETTER_AUTH_URL`, so it must match the port.
 
 ## 2. Drive it with the Playwright MCP
 
