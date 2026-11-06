@@ -16,7 +16,11 @@
 		"typecheck": "tsc --noEmit",
 		"prepare": "git config core.hooksPath .githooks",
 		"lint:probes": "sh scripts/check-lint-rules.sh",
-		"ui:add": "sh scripts/ui-add.sh"
+		"ui:add": "sh scripts/ui-add.sh",
+		"test": "vitest run",
+		"db:generate": "drizzle-kit generate",
+		"db:migrate": "drizzle-kit migrate",
+		"auth:schema": "pnpm dlx auth@1.7.18 generate --config src/server/auth.ts --output src/db/auth-schema.gen.ts --yes && oxfmt src/db/auth-schema.gen.ts"
 	},
 	"dependencies": {
 		"@fontsource-variable/geist": "^5.3.0",
@@ -25,10 +29,14 @@
 		"@tanstack/react-router": "1.170.46",
 		"@tanstack/react-router-devtools": "1.167.2",
 		"@tanstack/react-start": "1.169.4",
+		"arktype": "^2.2.9",
+		"better-auth": "^1.7.18",
 		"class-variance-authority": "^0.7.1",
 		"clsx": "^2.1.1",
+		"drizzle-orm": "^0.45.4",
 		"lucide-react": "^1.69.0",
 		"nitro": "3.0.260610-beta",
+		"pg": "^8.23.1",
 		"radix-ui": "^1.8.1",
 		"react": "^19.2.0",
 		"react-dom": "^19.2.0",
@@ -40,14 +48,17 @@
 		"@oxlint/plugins": "1.91.0",
 		"@tanstack/devtools-vite": "0.8.6",
 		"@types/node": "^22.10.2",
+		"@types/pg": "^8.23.1",
 		"@types/react": "^19.2.0",
 		"@types/react-dom": "^19.2.0",
 		"@vitejs/plugin-react": "^6.0.1",
+		"drizzle-kit": "^0.31.11",
 		"oxfmt": "^0.76.0",
 		"oxlint": "^1.91.0",
 		"oxlint-tsgolint": "^7.0.2006",
 		"typescript": "^6.0.2",
-		"vite": "^8.0.0"
+		"vite": "^8.0.0",
+		"vitest": "^5.1.0"
 	},
 	"packageManager": "pnpm@12.14.0",
 	"pnpm": {
