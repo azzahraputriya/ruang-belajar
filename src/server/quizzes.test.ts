@@ -31,6 +31,7 @@ import {
 	teacherQuiz,
 	updateQuestion,
 } from "#/server/quizzes";
+import { removeMember } from "#/server/classes";
 import { classWithStudent } from "#/test/fixtures";
 
 type Settings = { maxAttempts?: number; passScore?: number };
@@ -262,6 +263,18 @@ describe("attempt limits", () => {
 			{ questionId: choiceQ, correct: true },
 			{ questionId: numberQ, correct: false },
 		]);
+	});
+
+	it("question ids in any letter case match, but the same question twice is refused", async () => {
+		const { siswa, stepId, choiceQ, numberQ } = await classWithQuiz();
+		const upper = choiceQ.toUpperCase();
+		expect(await submitAttempt(siswa, stepId, { [upper]: "b", [choiceQ]: "a" })).toEqual({
+			ok: false,
+			reason: "invalid_answer",
+			questionId: choiceQ,
+		});
+		const result = await submitOk(siswa, stepId, { [upper]: "b", [numberQ]: 9.8 });
+		expect(result.attempt.score).toBe(100);
 	});
 
 	it("a quiz with no questions can't be submitted", async () => {
@@ -523,5 +536,12 @@ describe("teacher editing", () => {
 				{ studentId: siswa, attemptNumber: 2, score: 100, answers: answers.bothRight },
 			],
 		});
+	});
+
+	it("a student who left drops out of the attempts list", async () => {
+		const { guru, siswa, classId, stepId, answers } = await classWithQuiz();
+		await submitOk(siswa, stepId, answers.oneRight);
+		expect(await removeMember(guru, classId, siswa)).toMatchObject({ ok: true });
+		expect(await quizAttempts(guru, stepId)).toEqual({ ok: true, attempts: [] });
 	});
 });

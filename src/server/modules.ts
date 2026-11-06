@@ -293,9 +293,10 @@ export async function reorderSteps(actor: UserId, moduleId: ModuleId, orderedIds
 	});
 }
 
-// Every step in the class, in reading order, with its module's opening time and parsed content.
+// Every step in the class, in reading order, with its module's opening time and raw content.
+// shortcut: listModules fetches every step's content it then drops, because only quiz status needs it. Split the query if classes get big.
 async function stepsInClass(classId: ClassId) {
-	const rows = await db
+	return db
 		.select({
 			id: step.id,
 			moduleId: step.moduleId,
@@ -309,7 +310,6 @@ async function stepsInClass(classId: ClassId) {
 		.innerJoin(moduleTable, eq(moduleTable.id, step.moduleId))
 		.where(eq(moduleTable.classId, classId))
 		.orderBy(asc(moduleTable.position), asc(step.position));
-	return rows.map((row) => Object.assign(row, { parsed: contentOf(row) }));
 }
 
 // Modules in order, each with its steps in order. Content stays out: getStep returns it.
@@ -390,7 +390,9 @@ async function workInClass(classId: ClassId, studentId?: UserId) {
 	const scores = new Map<string, number[]>();
 	for (const row of attemptRows) {
 		const key = `${row.stepId}/${row.studentId}`;
-		scores.set(key, [...(scores.get(key) ?? []), row.score]);
+		const list = scores.get(key) ?? [];
+		list.push(row.score);
+		scores.set(key, list);
 	}
 	return (stepId: StepId, student: UserId): StepWork => ({
 		visits: visits.get(`${stepId}/${student}`) ?? new Set(),
@@ -407,7 +409,7 @@ export async function progressFor(actor: UserId, classId: ClassId) {
 	const [steps, workOf] = await Promise.all([stepsInClass(classId), workInClass(classId, actor)]);
 	const progress = steps
 		.filter((s) => visibleTo(role, s.opensAt, now))
-		.map((s) => ({ stepId: s.id, status: stepStatus(s.parsed, workOf(s.id, actor)) }));
+		.map((s) => ({ stepId: s.id, status: stepStatus(contentOf(s), workOf(s.id, actor)) }));
 	return { ok: true, progress } as const;
 }
 
@@ -427,14 +429,15 @@ export async function classProgress(actor: UserId, classId: ClassId) {
 		stepsInClass(classId),
 		workInClass(classId),
 	]);
+	const contents = steps.map(contentOf);
 	return {
 		ok: true,
 		steps: steps.map(({ id, moduleId, kind, title }) => ({ id, moduleId, kind, title })),
 		students: students.map((s) =>
 			Object.assign(s, {
-				progress: steps.map((st) => ({
+				progress: steps.map((st, i) => ({
 					stepId: st.id,
-					status: stepStatus(st.parsed, workOf(st.id, s.userId)),
+					status: stepStatus(contents[i], workOf(st.id, s.userId)),
 				})),
 			}),
 		),

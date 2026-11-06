@@ -81,6 +81,10 @@ describe("question input", () => {
 			choices: null,
 			key: { correct: { value: 9.8, tolerance: 0 } },
 		});
+		// null is how teacherQuiz says "no choices", so the editor can send a question straight back.
+		expect(valid({ kind: "short_text", prompt: "p", choices: null, correct: "ya" })).toMatchObject({
+			choices: null,
+		});
 	});
 
 	it("refuses keys that don't fit the question", () => {

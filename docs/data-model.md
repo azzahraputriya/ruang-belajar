@@ -99,7 +99,7 @@ Quiz questions are auto-graded only: single choice, multiple choice, number, sho
 
 ## Answer keys stay on the server
 
-`QuestionKey` is its own table, in its own schema file (`src/db/question-key-schema.ts`). It is left out of `src/db/schema.ts`, so the shared `db` client doesn't carry it, and the lint rule `ruang/question-key-server-only` lets only `src/server/quizzes.ts` (and later the AI tutor) import it. Only grading, the teacher's views, and the reveal below read it.
+`QuestionKey` is its own table, in its own schema file (`src/db/question-key-schema.ts`). It is left out of `src/db/schema.ts`, which keeps it off `db.query` but not off `db.select()`. The real guard is the lint rule `ruang/question-key-server-only`, which lets only `src/server/quizzes.ts` (and later the AI tutor) import it. Only grading, the teacher's views, and the reveal below read it.
 
 - While attempts remain, a student sees only which questions they got right. Never the correct answer, the feedback, or the solution.
 - Once the quiz closes for them (passed, or out of attempts), they see the correct answer, feedback, and solution of every question.

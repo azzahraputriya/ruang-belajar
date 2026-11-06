@@ -1,6 +1,6 @@
 // Owns: the question_key table, the correct answer, feedback, and solution for each question. Not here: anything a student may see (src/db/quiz-schema.ts).
 // Only the files the lint rule `ruang/question-key-server-only` allows may import this. It is kept
-// out of src/db/schema.ts on purpose, so the shared `db` client doesn't carry it either.
+// out of src/db/schema.ts too, which only keeps it off `db.query`. The lint rule is the real guard.
 
 import { jsonb, pgTable, text, uuid } from "drizzle-orm/pg-core";
 import type { QuestionId } from "#/db/ids";

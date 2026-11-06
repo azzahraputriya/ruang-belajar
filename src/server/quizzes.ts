@@ -3,6 +3,7 @@
 import { type } from "arktype";
 import { and, asc, eq, gt, sql } from "drizzle-orm";
 import { user } from "#/db/auth-schema.gen";
+import { classMember } from "#/db/class-schema";
 import { moduleTable, step } from "#/db/content-schema";
 import { db } from "#/db/client";
 import type { QuestionId, StepId, UserId } from "#/db/ids";
@@ -15,8 +16,9 @@ import { Markdown, quizProgress } from "#/server/step-kinds";
 
 export const QuestionKindInput = type.enumerated(...questionKind.enumValues);
 
-// A question and its key in one input. `choices` only for choice kinds, and `correct` must fit the
-// kind and name only choices that exist.
+// A question and its key in one input. `choices` only for choice kinds (null or left out for the
+// others, so the editor can send back what teacherQuiz gave it), and `correct` must fit the kind
+// and name only choices that exist.
 export const QuestionInput = type({
 	"+": "delete",
 	kind: QuestionKindInput,
@@ -27,7 +29,7 @@ export const QuestionInput = type({
 	solution: Markdown.default(""),
 }).pipe(({ kind, prompt, choices, correct, feedback, solution }, ctx) => {
 	const spec = QUESTION_KINDS[kind];
-	if (!spec.choices && choices !== undefined) return ctx.error(`${kind} questions have no choices`);
+	if (!spec.choices && choices != null) return ctx.error(`${kind} questions have no choices`);
 	const parsedChoices = spec.choices ? parseChoices(choices) : null;
 	if (parsedChoices instanceof type.errors) return ctx.error(`choices: ${parsedChoices.summary}`);
 	const key = spec.parseKey(correct, new Set(parsedChoices?.map((c) => c.id)));
@@ -118,7 +120,7 @@ async function readQuiz(conn: Conn, actor: UserId, stepId: StepId) {
 	const access = await stepFor(conn, actor, stepId);
 	if (!access) return undefined;
 	const parsed = contentOf(access.step);
-	return { role: access.role, parsed };
+	return { role: access.role, classId: access.classId, parsed };
 }
 
 export async function createQuestion(actor: UserId, stepId: StepId, input: QuestionInput) {
@@ -216,7 +218,8 @@ export async function teacherQuiz(actor: UserId, stepId: StepId) {
 	} as const;
 }
 
-// Every attempt by every student in the class, for the teacher. Grouped by student, then in order.
+// Every attempt by each current student of the class, for the teacher. Grouped by student, then in order.
+// Someone who left the class drops out here, as they do from classProgress.
 export async function quizAttempts(actor: UserId, stepId: StepId) {
 	const access = await readQuiz(db, actor, stepId);
 	if (!access) return NOT_FOUND;
@@ -234,6 +237,14 @@ export async function quizAttempts(actor: UserId, stepId: StepId) {
 		})
 		.from(quizAttempt)
 		.innerJoin(user, eq(user.id, quizAttempt.studentId))
+		.innerJoin(
+			classMember,
+			and(
+				eq(classMember.userId, quizAttempt.studentId),
+				eq(classMember.classId, access.classId),
+				eq(classMember.role, "student"),
+			),
+		)
 		.where(eq(quizAttempt.stepId, stepId))
 		.orderBy(asc(user.username), asc(quizAttempt.attemptNumber));
 	return {
@@ -306,18 +317,26 @@ export async function submitAttempt(actor: UserId, stepId: StepId, answers: Answ
 
 		const rows = await questionsWithKeys(tx, stepId);
 		if (rows.length === 0) return fail("no_questions");
+		// Postgres returns uuids in lowercase, and an uppercase uuid is still valid input. Ids that
+		// aren't in this quiz, or two ids for the same question, refuse the attempt.
 		const known = new Set<string>(rows.map((r) => r.question.id));
-		const unknown = Object.keys(answers).find((id) => !known.has(id));
-		if (unknown !== undefined) return { ...fail("invalid_answer"), questionId: unknown };
+		const given = new Map<string, unknown>();
+		for (const [id, value] of Object.entries(answers)) {
+			const lower = id.toLowerCase();
+			if (!known.has(lower) || given.has(lower)) {
+				return { ...fail("invalid_answer"), questionId: id };
+			}
+			given.set(lower, value);
+		}
 
 		const stored: Record<string, unknown> = {};
 		const results: { questionId: QuestionId; correct: boolean }[] = [];
 		for (const { question: q, key } of rows) {
-			if (!Object.hasOwn(answers, q.id)) {
+			if (!given.has(q.id)) {
 				results.push({ questionId: q.id, correct: false });
 				continue;
 			}
-			const graded = QUESTION_KINDS[q.kind].grade(key.correct, answers[q.id]);
+			const graded = QUESTION_KINDS[q.kind].grade(key.correct, given.get(q.id));
 			if (!graded) return { ...fail("invalid_answer"), questionId: q.id };
 			stored[q.id] = graded.answer;
 			results.push({ questionId: q.id, correct: graded.correct });

@@ -30,14 +30,16 @@ const KEY_SCHEMA = /(^|\/)question-key-schema(\.ts)?$/;
 // tutor. Anchored to src/server/, so tests, `*-fns.ts`, routes, components, and lib never match.
 const KEY_READERS = /(^|\/)src\/server\/(quizzes|tutor)\.ts$/;
 
-// Answer keys must never reach the browser. Server functions (`*-fns.ts`) are bundled with client
-// code, so they call into the allowed modules instead of reading keys themselves.
+// Answer keys must never reach a student early. Every key read sits in one module that applies the
+// reveal rule, so a server function, route, or component can't read keys and skip that rule. Client
+// files would also pull the table into browser code. Server functions (`*-fns.ts`) stay out too:
+// their handlers are server-only, but they are where a new screen's data gets shaped.
 const questionKeyServerOnly = defineRule({
 	meta: {
 		type: "problem",
 		messages: {
 			forbidden:
-				"Only src/server/quizzes.ts (and the AI tutor) may import the question_key schema, so answer keys never reach the browser. Call a function in src/server/quizzes.ts that returns only what this caller may see.",
+				"Only src/server/quizzes.ts (and the AI tutor) may import the question_key schema, so every key read goes through the rule for when a student may see solutions. Call a function in src/server/quizzes.ts that returns only what this caller may see.",
 		},
 	},
 	create(context) {
