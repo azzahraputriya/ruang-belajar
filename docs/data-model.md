@@ -110,8 +110,8 @@ Each student's status on a step comes from their work rows:
 
 | Status      | When                                                               |
 | ----------- | ------------------------------------------------------------------ |
-| not started | no `StepVisit`                                                     |
-| in progress | visited, not finished                                              |
+| not started | no `StepVisit` and no `QuizAttempt`                                |
+| in progress | visited or attempted, not finished                                 |
 | needs help  | quiz attempts used up below the pass score, or submission returned |
 | done        | reading/embed marked done, quiz passed, or work submitted          |
 | graded      | submission graded                                                  |

@@ -19,7 +19,9 @@ export const normalizeText = (text: string) =>
 	text.normalize("NFKC").trim().replace(/\s+/gu, " ").toLowerCase();
 
 // Floating-point slack for number answers, so 9.9 counts for 9.8 ± 0.1 (9.9 - 9.8 is 0.10000000000000142).
-const numberSlack = (value: number) => 1e-9 * Math.max(1, Math.abs(value));
+// A few units of rounding error at the size of the numbers, so even huge values never gain a whole step.
+const numberSlack = (a: number, b: number) =>
+	4 * Number.EPSILON * Math.max(1, Math.abs(a), Math.abs(b));
 
 // An ArkType type, seen as a function. Typing it this way makes TypeScript infer the parsed output.
 type Parse<T> = (raw: unknown) => T | ArkErrors;
@@ -89,7 +91,7 @@ export const QUESTION_KINDS = {
 		key: type({ "+": "delete", value: "number", tolerance: ["number >= 0", "=", 0] }),
 		answer: type("number"),
 		grade: ({ value, tolerance }, answer) =>
-			Math.abs(answer - value) <= tolerance + numberSlack(value),
+			Math.abs(answer - value) <= tolerance + numberSlack(value, answer),
 	}),
 	short_text: questionKind({
 		choices: false,

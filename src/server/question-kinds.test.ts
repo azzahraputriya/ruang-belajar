@@ -45,6 +45,8 @@ describe("grading", () => {
 		expect(grade("number", { value: 0.3, tolerance: 0 }, 0.1 + 0.2)).toBe(true);
 		expect(grade("number", { value: 0.3, tolerance: 0 }, 0.31)).toBe(false);
 		expect(grade("number", { value: 1_000_000, tolerance: 0 }, 1_000_000.01)).toBe(false);
+		expect(grade("number", { value: 2e9, tolerance: 0 }, 2e9 + 1)).toBe(false);
+		expect(grade("number", { value: 2e9, tolerance: 0 }, 2e9)).toBe(true);
 	});
 
 	it("short text ignores case, outer spaces, and repeated inner whitespace, but nothing else", () => {
