@@ -22,6 +22,6 @@ esac
 
 ./node_modules/.bin/oxfmt "$file" >/dev/null 2>&1
 if ! out=$(./node_modules/.bin/oxlint --deny-warnings "$file" 2>&1); then
-	printf 'Lint errors in %s. Fix them now. Why each rule exists: AGENTS.md "Lint rules".\n%s\n' "$file" "$out" >&2
+	printf 'Lint errors in %s. Fix them now. Why each rule exists: docs/lint-rules.md.\n%s\n' "$file" "$out" >&2
 	exit 2
 fi

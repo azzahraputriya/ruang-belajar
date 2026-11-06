@@ -1,54 +1,36 @@
 # Ruang Belajar
 
-A general LMS for any class and any subject, with an AI tutor chat. It grows out of the physics-only "Ruang Fisika" design in `../mspd/` (PRDs in `a1/`, `a3/`; tutor prompt and tests in `a6/`). Read those for intent, not as rules for this repo. The data model draft is `docs/data-model.md`.
+A general LMS for any class and any subject, with an AI tutor chat. Product intent comes from the physics-only "Ruang Fisika" design in `../mspd/` (PRDs in `a1/`, `a3/`; tutor prompt and tests in `a6/`). That folder exists only on the original machine. Read it for intent, not as rules for this repo.
 
-`.claude/settings.json` excludes the parent `arra` instructions on purpose. They are coursework rules and do not apply here.
+The data model, and the libraries chosen for it, are in `docs/data-model.md`. Use those: Postgres with Drizzle, better-auth with username login, and ArkType to parse input. Don't add an alternative such as Prisma or zod.
 
-## Identity
+## Identity and GitHub
 
-The repo belongs to the student account. Commits use the repo-level git config, already set. Run every GitHub command through `../gh-arra`, never plain `gh`, and check `../gh-arra api user --jq .login` returns `azzahraputriya` first.
+The repo belongs to the student account.
 
-`main` is protected. Work on a branch and open a pull request.
+- Commit as `Azzahra Putriya Ahmad <321860017+azzahraputriya@users.noreply.github.com>`. In a fresh clone, set both with `git config` before the first commit.
+- Run every GitHub command through `../gh-arra`, never plain `gh`. First check that `../gh-arra api user --jq .login` returns `azzahraputriya`. If `../gh-arra` is missing, stop and ask.
+- `main` is protected. Work on a branch, then open a pull request with `../gh-arra pr create`. Titles use conventional commits, e.g. `feat(auth): username sign-up`.
+- Don't remove `claudeMdExcludes` from `.claude/settings.json`. It keeps the parent folder's coursework instructions out.
 
-## Stack
+## Generated files
 
-TanStack Start (React, file routes in `src/routes/`), Vite, Nitro node server, Tailwind v4, oxlint (type-aware), oxfmt, pnpm.
+`src/routeTree.gen.ts` is rebuilt from `src/routes/` on every `pnpm dev` and `pnpm build`. Never edit it. Change the route files instead.
 
-## Commands
+## Before you finish
 
-- `pnpm dev` runs the dev server on port 3000.
-- `pnpm build` writes the production server to `.output/`. Start it with `node .output/server/index.mjs`.
-- `pnpm check` runs oxlint and checks oxfmt formatting. `pnpm format` fixes formatting.
-- `pnpm typecheck` runs `tsc`.
-- `pnpm lint:probes` proves each lint rule below still fires.
+Always run `pnpm check` (lint and format) and `pnpm typecheck`. `pnpm format` fixes formatting. Then add:
 
-## Lint rules
+- `pnpm build` when you change routes, server code, or `vite.config.ts`. To try the result, run `node .output/server/index.mjs`.
+- `pnpm lint:probes` when you change `.oxlintrc.json`. Also add a probe and a row in `docs/lint-rules.md` for each new rule.
 
-Lint is the spec. Code is done when `pnpm check` and `pnpm typecheck` pass. Claude Code hooks lint every file you edit and block finishing until both pass. The pre-push hook runs them again.
+## Lint errors that need project knowledge
 
-| Rule                                                                        | What it asks                                      | Why                                                                    |
-| --------------------------------------------------------------------------- | ------------------------------------------------- | ---------------------------------------------------------------------- |
-| `import/no-default-export`                                                  | Named exports only. Config files are exempt.      | `rg "export const Foo"` finds every definition.                        |
-| `typescript/consistent-type-imports`                                        | `import type` for types.                          | Types vanish at build time, and the intent is visible.                 |
-| `unicorn/filename-case`                                                     | kebab-case file names. Routes are exempt.         | Predictable paths to glob. TanStack routes need `__root` and `$param`. |
-| `max-lines`                                                                 | 300 lines per file at most.                       | Small files are easier to read whole and to place.                     |
-| `import/no-relative-parent-imports`                                         | Import with `#/...`, never `../`.                 | One absolute path per module. Moves don't break imports.               |
-| `import/no-cycle`                                                           | No import cycles.                                 | Cycles hide layering mistakes and break load order.                    |
-| `typescript/no-explicit-any`, `no-unsafe-*`                                 | No `any`, and no unchecked use of untyped values. | Parse unknown data at the boundary, then trust the types.              |
-| `typescript/no-non-null-assertion`, `ban-ts-comment`                        | No `!` and no `@ts-ignore`.                       | They silence the type checker instead of fixing the cause.             |
-| `typescript/consistent-type-definitions`                                    | `type`, not `interface`.                          | One way to declare shapes.                                             |
-| `typescript/switch-exhaustiveness-check`                                    | Every union case is handled.                      | A new step kind or status can't be forgotten.                          |
-| `typescript/no-floating-promises`, `no-misused-promises`                    | Every promise is awaited or handled.              | Unhandled failures disappear silently.                                 |
-| `no-eval`, `no-new-func`, `typescript/no-implied-eval`                      | No code from strings.                             | Security.                                                              |
-| `no-console`                                                                | No `console.*`.                                   | Logging will go through one logger.                                    |
-| `react/rules-of-hooks`, `react/exhaustive-deps`, `react/no-array-index-key` | Hooks used correctly and stable list keys.        | Avoids stale state and render bugs.                                    |
-| `unicorn/no-nested-ternary`, `no-param-reassign`                            | Flat conditionals, no reassigned parameters.      | Easier to read.                                                        |
+The edit hook reports every lint error with its rule. Most fixes are obvious from the message. These are not:
 
-Every rule in the `correctness`, `suspicious`, and `perf` groups is also an error.
+- `import/no-relative-parent-imports`: import with `#/...`, which maps to `src/`.
+- `typescript/no-explicit-any` and `no-unsafe-*`: parse unknown data with ArkType where it enters, then use the parsed type.
+- `no-console`: there is no logger yet. Don't log. Let errors throw with a clear message. If a feature really needs logs, stop and ask.
+- A waiver needs a reason: `// oxlint-disable-next-line <rule> -- <why>`. Keep the existing one in `src/router.tsx`, because TanStack's type registration needs an `interface`.
 
-### Changing the rules
-
-- When a review comment or bug would recur, turn it into a rule instead of a note here.
-- Add a probe for every new rule in `scripts/check-lint-rules.sh`, and add a row to the table above.
-- A real exception gets an inline waiver with the reason: `// oxlint-disable-next-line <rule> -- <why>`. Unused waivers are errors.
-- Planned: a custom rule that keeps quiz answer keys server-only, added when that code exists.
+Why each rule exists: `docs/lint-rules.md`.

@@ -107,7 +107,9 @@ Lateness is computed from `submittedAt` and the module's `dueAt`.
 
 Uploads store a storage key, not a disk path. They can start on local disk and move to object storage later with no data change.
 
-## Types
+## Storage and types
+
+- Postgres 16 in one Docker container on the VPS, accessed through Drizzle. No Redis.
 
 - IDs are branded (`ClassId`, `StepId`, ...) so they can't be swapped by mistake.
 - Row types are inferred from the Drizzle schema, never written by hand.
