@@ -1,0 +1,10 @@
+node_modules
+.output
+.git
+.claude
+mocks
+.playwright-mcp
+.env*
+.nitro
+.tanstack
+dist
