@@ -51,7 +51,11 @@ Classes are invite-only. A teacher invites an existing account by username. The 
 | pending | decline | declined | invitee         |
 | pending | revoke  | revoked  | a class teacher |
 
-Accepting adds the `ClassMember` row in the same transaction. Accepting twice leaves the same result as once. At most one pending invite per class and user. A teacher can remove a member at any time. A class always keeps at least one teacher, so the last teacher can't leave, be removed, or be changed to student.
+Accepting adds the `ClassMember` row in the same transaction. Accepting twice leaves the same result as once. At most one pending invite per class and user.
+
+- Repeating a move that already happened (accept, decline, or revoke twice) succeeds and changes nothing. So a member who was removed can't rejoin by replaying an old accept.
+- Any other move out of a closed invite is refused. You can't accept after a decline or a revoke. The teacher sends a new invite instead.
+- The invitee isn't a member yet, but still sees the class title and the inviter's username in their pending invites. Nobody else outside the class can see the class or the invite. A teacher can remove a member at any time. A class always keeps at least one teacher, so the last teacher can't leave, be removed, or be changed to student.
 
 ## Step kinds
 

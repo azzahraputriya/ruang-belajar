@@ -11,7 +11,7 @@ import * as schema from "#/db/schema";
 import { env } from "#/env";
 
 // Accepts any case and stores lowercase, so "Budi" and "budi" are the same account.
-const Username = type("string.lower")
+export const Username = type("string.lower")
 	.to(/^[a-z0-9_.]{3,30}$/)
 	.describe("3 to 30 letters, digits, _ or .");
 
