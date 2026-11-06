@@ -1,0 +1,20 @@
+# Separate from CI so editing a PR description re-runs only this check, not the build.
+name: PR format
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, edited, reopened, synchronize]
+
+permissions:
+  contents: read
+
+jobs:
+  pr-format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Description follows the PR template
+        env:
+          BODY: ${{ github.event.pull_request.body }}
+        run: sh scripts/check-pr-body.sh
