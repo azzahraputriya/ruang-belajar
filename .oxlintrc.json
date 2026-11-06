@@ -67,5 +67,5 @@
 			}
 		}
 	],
-	"ignorePatterns": ["src/routeTree.gen.ts", ".claude/worktrees/**", "mocks/**"]
+	"ignorePatterns": ["src/**/*.gen.ts", ".claude/worktrees/**", "mocks/**"]
 }

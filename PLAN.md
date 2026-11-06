@@ -9,7 +9,7 @@ This file is the roadmap. To pick up work, take the first phase that is `in prog
 | Phase                           | Status      | PRs                  |
 | ------------------------------- | ----------- | -------------------- |
 | 0. Repo setup                   | in review   | #1 to #5, release #6 |
-| 1. Accounts                     | not started |                      |
+| 1. Accounts                     | in progress |                      |
 | 2. Deploy                       | not started |                      |
 | 3. Classes and invites          | not started |                      |
 | 4. Content: modules and steps   | not started |                      |
