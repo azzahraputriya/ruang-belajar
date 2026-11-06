@@ -11,6 +11,9 @@ The repo belongs to the student account.
 - Commit as `Azzahra Putriya Ahmad <321860017+azzahraputriya@users.noreply.github.com>`. In a fresh clone, set both with `git config` before the first commit.
 - Run every GitHub command through `../gh-arra`, never plain `gh`. First check that `../gh-arra api user --jq .login` returns `azzahraputriya`. If `../gh-arra` is missing, stop and ask.
 - `main` is protected. Work on a branch, then open a pull request with `../gh-arra pr create`. Titles use conventional commits, e.g. `feat(auth): username sign-up`.
+- PR descriptions follow `.github/pull_request_template.md`. `gh pr create --body-file` skips the template, so copy its sections into your body file. CI's `pr-format` check fails without "What changed", "Decisions", "Review notes", and a filled-in `Made by: <model> via <harness>`.
+  - List under "Assumed" every choice you made that the person didn't ask for.
+  - Screenshots for "Evidence": save the PNGs locally and give the person their paths. They drag them in. Never link images from a branch.
 - Don't remove `claudeMdExcludes` from `.claude/settings.json`. It keeps the parent folder's coursework instructions out.
 
 ## File boundaries
