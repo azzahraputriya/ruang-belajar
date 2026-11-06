@@ -12,7 +12,9 @@
 		"preview": "vite preview",
 		"lint": "oxlint",
 		"format": "oxfmt",
-		"check": "oxlint --deny-warnings && oxfmt --check"
+		"check": "oxlint --deny-warnings && oxfmt --check",
+		"typecheck": "tsc --noEmit",
+		"prepare": "git config core.hooksPath .githooks"
 	},
 	"dependencies": {
 		"@tailwindcss/vite": "^4.1.18",
@@ -36,6 +38,7 @@
 		"typescript": "^6.0.2",
 		"vite": "^8.0.0"
 	},
+	"packageManager": "pnpm@12.14.0",
 	"pnpm": {
 		"onlyBuiltDependencies": [
 			"esbuild",
