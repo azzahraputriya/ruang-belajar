@@ -1,5 +1,72 @@
 {
 	"$schema": "./node_modules/oxlint/configuration_schema.json",
-	"plugins": ["typescript", "unicorn", "oxc", "react", "jsx-a11y"],
+	"plugins": ["typescript", "unicorn", "oxc", "react", "jsx-a11y", "import"],
+	"options": {
+		"typeAware": true,
+		"reportUnusedDisableDirectives": "error"
+	},
+	"categories": {
+		"correctness": "error",
+		"suspicious": "error",
+		"perf": "error"
+	},
+	"rules": {
+		"import/no-default-export": "error",
+		"import/no-duplicates": "error",
+		"typescript/consistent-type-imports": "error",
+		"unicorn/filename-case": [
+			"error",
+			{
+				"case": "kebabCase"
+			}
+		],
+		"max-lines": [
+			"error",
+			{
+				"max": 300,
+				"skipBlankLines": true,
+				"skipComments": true
+			}
+		],
+		"import/no-relative-parent-imports": "error",
+		"import/no-cycle": "error",
+		"typescript/no-explicit-any": "error",
+		"typescript/no-non-null-assertion": "error",
+		"typescript/ban-ts-comment": "error",
+		"typescript/no-unsafe-argument": "error",
+		"typescript/no-unsafe-assignment": "error",
+		"typescript/no-unsafe-call": "error",
+		"typescript/no-unsafe-member-access": "error",
+		"typescript/no-unsafe-return": "error",
+		"typescript/switch-exhaustiveness-check": "error",
+		"typescript/consistent-type-definitions": ["error", "type"],
+		"typescript/no-floating-promises": "error",
+		"typescript/no-misused-promises": "error",
+		"no-eval": "error",
+		"no-new-func": "error",
+		"typescript/no-implied-eval": "error",
+		"no-console": "error",
+		"react/rules-of-hooks": "error",
+		"react/exhaustive-deps": "error",
+		"react/no-array-index-key": "error",
+		"unicorn/no-nested-ternary": "error",
+		"no-param-reassign": "error",
+		"react/react-in-jsx-scope": "off"
+	},
+	"overrides": [
+		{
+			"files": ["*.config.ts"],
+			"rules": {
+				"import/no-default-export": "off"
+			}
+		},
+		{
+			"files": ["src/routes/**"],
+			"rules": {
+				"unicorn/filename-case": "off",
+				"react/only-export-components": "off"
+			}
+		}
+	],
 	"ignorePatterns": ["src/routeTree.gen.ts"]
 }

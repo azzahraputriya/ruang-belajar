@@ -14,7 +14,8 @@
 		"format": "oxfmt",
 		"check": "oxlint --deny-warnings && oxfmt --check",
 		"typecheck": "tsc --noEmit",
-		"prepare": "git config core.hooksPath .githooks"
+		"prepare": "git config core.hooksPath .githooks",
+		"lint:probes": "sh scripts/check-lint-rules.sh"
 	},
 	"dependencies": {
 		"@tailwindcss/vite": "^4.1.18",
@@ -35,6 +36,7 @@
 		"@vitejs/plugin-react": "^6.0.1",
 		"oxfmt": "^0.76.0",
 		"oxlint": "^1.91.0",
+		"oxlint-tsgolint": "^7.0.2006",
 		"typescript": "^6.0.2",
 		"vite": "^8.0.0"
 	},

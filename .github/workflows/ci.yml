@@ -1,4 +1,5 @@
 # Lint and format run in the local pre-push hook, so CI only runs what the hook does not.
+# lint:probes is not a lint run. It checks that the lint config still catches what it should.
 name: CI
 
 on:
@@ -25,6 +26,8 @@ jobs:
           node-version-file: .node-version
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
+      - name: Lint rules still fire
+        run: pnpm lint:probes
 
   build:
     runs-on: ubuntu-latest
