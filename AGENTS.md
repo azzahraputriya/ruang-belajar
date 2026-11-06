@@ -13,6 +13,14 @@ The repo belongs to the student account.
 - `main` is protected. Work on a branch, then open a pull request with `../gh-arra pr create`. Titles use conventional commits, e.g. `feat(auth): username sign-up`.
 - Don't remove `claudeMdExcludes` from `.claude/settings.json`. It keeps the parent folder's coursework instructions out.
 
+## File boundaries
+
+Every file in `src/` opens with `// Owns: <what this file is for>. Not here: <what goes elsewhere>.` Files have no length limit, so the header is what keeps each one focused.
+
+- Before adding code to a file, read its header. Add the code only if it fits.
+- If it doesn't fit, put it in the file whose header covers it (`rg "^// Owns:" src` lists them all), or create a new file with its own header.
+- If a file's job really changes, update its header in the same edit.
+
 ## Generated files
 
 `src/routeTree.gen.ts` is rebuilt from `src/routes/` on every `pnpm dev` and `pnpm build`. Never edit it. Change the route files instead.

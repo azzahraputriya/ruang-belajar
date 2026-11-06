@@ -26,6 +26,7 @@ probe interface.ts 'typescript(consistent-type-definitions)' 'export interface T
 probe console.ts 'eslint(no-console)' 'console.log("hi");\nexport {};\n'
 probe eval.ts 'eslint(no-eval)' 'export const r = eval("1");\n'
 probe BadName.ts 'unicorn(filename-case)' 'export const bad = 1;\n'
+probe no-header.ts 'ruang(file-header)' 'export const n = 1;\n'
 
 out=$(./node_modules/.bin/oxlint "$dir" 2>&1 || true)
 

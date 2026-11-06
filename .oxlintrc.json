@@ -1,6 +1,7 @@
 {
 	"$schema": "./node_modules/oxlint/configuration_schema.json",
 	"plugins": ["typescript", "unicorn", "oxc", "react", "jsx-a11y", "import"],
+	"jsPlugins": ["./lint-plugins/ruang.js"],
 	"options": {
 		"typeAware": true,
 		"reportUnusedDisableDirectives": "error"
@@ -18,14 +19,6 @@
 			"error",
 			{
 				"case": "kebabCase"
-			}
-		],
-		"max-lines": [
-			"error",
-			{
-				"max": 300,
-				"skipBlankLines": true,
-				"skipComments": true
 			}
 		],
 		"import/no-relative-parent-imports": "error",
@@ -55,7 +48,13 @@
 	},
 	"overrides": [
 		{
-			"files": ["*.config.ts"],
+			"files": ["src/**"],
+			"rules": {
+				"ruang/file-header": "error"
+			}
+		},
+		{
+			"files": ["*.config.ts", "lint-plugins/**"],
 			"rules": {
 				"import/no-default-export": "off"
 			}

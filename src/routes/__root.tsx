@@ -1,3 +1,5 @@
+// Owns: the HTML shell every page renders inside (head tags, global CSS, devtools). Not here: page content or data loading.
+
 import { TanStackDevtools } from "@tanstack/react-devtools";
 import { createRootRoute, HeadContent, Scripts } from "@tanstack/react-router";
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";

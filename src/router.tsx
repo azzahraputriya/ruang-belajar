@@ -1,3 +1,5 @@
+// Owns: creating the app router and registering its type with TanStack Router. Not here: routes (src/routes/).
+
 import { createRouter as createTanStackRouter } from "@tanstack/react-router";
 import { routeTree } from "./routeTree.gen";
 
