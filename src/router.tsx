@@ -1,3 +1,5 @@
+// Owns: creating the app router and registering its type with TanStack Router. Not here: routes (src/routes/).
+
 import { createRouter as createTanStackRouter } from "@tanstack/react-router";
 import { routeTree } from "./routeTree.gen";
 
@@ -13,6 +15,7 @@ export function getRouter() {
 }
 
 declare module "@tanstack/react-router" {
+	// oxlint-disable-next-line typescript/consistent-type-definitions -- TanStack type registration needs interface merging
 	interface Register {
 		router: ReturnType<typeof getRouter>;
 	}

@@ -2,7 +2,42 @@
 	"claudeMdExcludes": [
 		"**/arra/CLAUDE.md",
 		"**/arra/AGENTS.md",
-		"**/arra/*/CLAUDE.md",
-		"**/arra/*/AGENTS.md"
-	]
+		"**/arra/!(ruang-belajar)/**/CLAUDE.md",
+		"**/arra/!(ruang-belajar)/**/AGENTS.md"
+	],
+	"hooks": {
+		"PostToolUse": [
+			{
+				"matcher": "Edit|MultiEdit|Write",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "sh \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/lint-edited-file.sh"
+					}
+				]
+			}
+		],
+		"Stop": [
+			{
+				"hooks": [
+					{
+						"type": "command",
+						"command": "sh \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/check-before-stop.sh"
+					}
+				]
+			}
+		]
+	},
+	"permissions": {
+		"allow": [
+			"Bash(pnpm check)",
+			"Bash(pnpm typecheck)",
+			"Bash(pnpm format)",
+			"Bash(pnpm lint:probes)",
+			"Bash(rtk pnpm check)",
+			"Bash(rtk pnpm typecheck)",
+			"Bash(rtk pnpm format)",
+			"Bash(rtk pnpm lint:probes)"
+		]
+	}
 }
