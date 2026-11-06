@@ -1,5 +1,5 @@
 # The live app and its own Postgres. A separate project from docker-compose.yml, so it never shares the dev database.
-# Both services read .env.production directly. Compose fills ${...} from .env, which is the dev file, so this file uses none.
+# Always run it with `--env-file .env.production`. The app reads that whole file, and the database gets only its password.
 name: ruang-belajar-prod
 
 services:
@@ -19,15 +19,16 @@ services:
   db:
     image: postgres:16-alpine
     restart: unless-stopped
-    env_file: .env.production
     environment:
       POSTGRES_USER: ruang
       POSTGRES_DB: ruang
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?pass --env-file .env.production}
     # No ports: only the app container can reach it.
     volumes:
       - db-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      # Over TCP: on first start Postgres runs a socket-only setup server that would pass a socket check.
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 2s
       timeout: 3s
       retries: 15

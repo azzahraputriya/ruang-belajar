@@ -5,3 +5,6 @@ node_modules
 mocks
 .playwright-mcp
 .env*
+.nitro
+.tanstack
+dist

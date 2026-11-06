@@ -27,22 +27,28 @@ Fill in `.env.production`. Git ignores it.
 Postgres saves the password the first time the volume is created. If you deploy from another checkout, copy this same file there. A newly generated one won't connect. Changing `BETTER_AUTH_SECRET` signs everyone out.
 
 ```bash
-docker compose -f docker-compose.prod.yml up -d --build
+docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
 curl -fsS http://127.0.0.1:3300/api/auth/get-session   # prints null with a 200
 ```
 
 ## Redeploy after a merge
 
+If the merge adds a file in `drizzle/`, the new container changes the live database on start. Save a copy first:
+
+```bash
+docker compose -f docker-compose.prod.yml --env-file .env.production exec db pg_dump -U ruang ruang > ~/ruang-$(date +%F).sql
+```
+
 ```bash
 git pull
-docker compose -f docker-compose.prod.yml up -d --build
+docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
 ```
 
 ## Logs and status
 
 ```bash
-docker compose -f docker-compose.prod.yml ps
-docker compose -f docker-compose.prod.yml logs -f app
+docker compose -f docker-compose.prod.yml --env-file .env.production ps
+docker compose -f docker-compose.prod.yml --env-file .env.production logs -f app
 ```
 
 ## Make it public through the tunnel
@@ -54,7 +60,7 @@ A person does this step, once, with Afief's go-ahead. The tunnel already carries
    ```yaml
    ingress:
      - hostname: remote-dev.afiefabd.com
-       service: <unchanged> # the existing rule, keep it as it is
+       service: ssh://localhost:22
      - hostname: lms.afiefabd.com
        service: http://127.0.0.1:3300
      - service: http_status:404
@@ -81,4 +87,4 @@ A person does this step, once, with Afief's go-ahead. The tunnel already carries
 
 5. Confirm both hostnames work. `https://lms.afiefabd.com` shows the app, and SSH to `remote-dev.afiefabd.com` connects again.
 
-If the tunnel runs from a dashboard token instead of `config.yml`, it ignores the file's ingress rules. Add the hostname in the Cloudflare Zero Trust dashboard under the tunnel's public hostnames instead.
+The service runs `cloudflared --config /etc/cloudflared/config.yml tunnel run`, so the file above is the one it reads.

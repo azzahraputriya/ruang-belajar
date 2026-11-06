@@ -9,7 +9,6 @@ export default defineConfig({
 	build: {
 		ssr: "scripts/migrate.ts",
 		outDir: ".output/migrate",
-		target: "node22",
 		rollupOptions: { output: { entryFileNames: "migrate.mjs" } },
 	},
 });
