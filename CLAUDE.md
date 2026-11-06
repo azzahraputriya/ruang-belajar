@@ -10,10 +10,10 @@ The repo belongs to the student account. Commits use the repo-level git config, 
 
 ## Stack
 
-TanStack Start (React, file routes in `src/routes/`), Vite, Nitro node server, Tailwind v4, Biome, pnpm.
+TanStack Start (React, file routes in `src/routes/`), Vite, Nitro node server, Tailwind v4, oxlint, oxfmt, pnpm.
 
 ## Commands
 
 - `pnpm dev` runs the dev server on port 3000.
 - `pnpm build` writes the production server to `.output/`. Start it with `node .output/server/index.mjs`.
-- `pnpm check` runs Biome (lint and format).
+- `pnpm check` runs oxlint and checks oxfmt formatting. `pnpm format` fixes formatting.

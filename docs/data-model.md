@@ -45,11 +45,11 @@ Username and password. better-auth still needs an email on every user, so sign-u
 
 Classes are invite-only. A teacher invites an existing account by username. The role defaults to `student`, and the teacher can pick `teacher` instead.
 
-| From | Action | To | Who |
-|---|---|---|---|
-| pending | accept | accepted | invitee |
-| pending | decline | declined | invitee |
-| pending | revoke | revoked | a class teacher |
+| From    | Action  | To       | Who             |
+| ------- | ------- | -------- | --------------- |
+| pending | accept  | accepted | invitee         |
+| pending | decline | declined | invitee         |
+| pending | revoke  | revoked  | a class teacher |
 
 Accepting adds the `ClassMember` row in the same transaction. Accepting twice leaves the same result as once. At most one pending invite per class and user. A teacher can remove a member at any time. A class always keeps at least one teacher, so the last teacher can't leave, be removed, or be changed to student.
 
@@ -57,14 +57,14 @@ Accepting adds the `ClassMember` row in the same transaction. Accepting twice le
 
 A step is a tagged union. `kind` picks the shape of `content` and what the student hands in.
 
-| Kind | Content | Student hands in | Scored |
-|---|---|---|---|
-| `reading` | rich text, images | nothing, marks it done | no |
-| `embed` | URL (e.g. a PhET simulation), instructions | nothing, marks it done | no |
-| `quiz` | questions, max attempts (default 3), pass score | `QuizAttempt` | yes, best attempt counts |
-| `assignment` | prompt, accepts text and/or files, optional rubric | `Submission` | yes, by the teacher |
-| `reflection` | prompt | `Submission` (text) | no |
-| `discussion` | prompt, required posts and replies | `DiscussionPost` | no |
+| Kind         | Content                                            | Student hands in       | Scored                   |
+| ------------ | -------------------------------------------------- | ---------------------- | ------------------------ |
+| `reading`    | rich text, images                                  | nothing, marks it done | no                       |
+| `embed`      | URL (e.g. a PhET simulation), instructions         | nothing, marks it done | no                       |
+| `quiz`       | questions, max attempts (default 3), pass score    | `QuizAttempt`          | yes, best attempt counts |
+| `assignment` | prompt, accepts text and/or files, optional rubric | `Submission`           | yes, by the teacher      |
+| `reflection` | prompt                                             | `Submission` (text)    | no                       |
+| `discussion` | prompt, required posts and replies                 | `DiscussionPost`       | no                       |
 
 Quiz questions are auto-graded only: single choice, multiple choice, number, short exact answer. Essays are an `assignment`. The old physics final test (8 choice + 7 essay) becomes one quiz step and one assignment step.
 
@@ -76,24 +76,24 @@ Quiz questions are auto-graded only: single choice, multiple choice, number, sho
 
 Each student's status on a step comes from their work rows:
 
-| Status | When |
-|---|---|
-| not started | no `StepVisit` |
-| in progress | visited, not finished |
-| needs help | quiz attempts used up below the pass score, or submission returned |
-| done | reading/embed marked done, quiz passed, or work submitted |
-| graded | submission graded |
+| Status      | When                                                               |
+| ----------- | ------------------------------------------------------------------ |
+| not started | no `StepVisit`                                                     |
+| in progress | visited, not finished                                              |
+| needs help  | quiz attempts used up below the pass score, or submission returned |
+| done        | reading/embed marked done, quiz passed, or work submitted          |
+| graded      | submission graded                                                  |
 
 ## Submission lifecycle
 
 The only stored status. Moves follow this table, nothing else.
 
-| From | Action | To | Who |
-|---|---|---|---|
-| draft | submit | submitted | student |
-| submitted | return with comment | returned | teacher |
-| returned | submit | submitted | student |
-| submitted | grade | graded | teacher |
+| From      | Action              | To        | Who     |
+| --------- | ------------------- | --------- | ------- |
+| draft     | submit              | submitted | student |
+| submitted | return with comment | returned  | teacher |
+| returned  | submit              | submitted | student |
+| submitted | grade               | graded    | teacher |
 
 Lateness is computed from `submittedAt` and the module's `dueAt`.
 
@@ -116,4 +116,3 @@ Uploads store a storage key, not a disk path. They can start on local disk and m
 ## Not in the first version
 
 Comments on announcements, password reset, notifications, analytics, offline mode, grade weights, glossary, search.
-

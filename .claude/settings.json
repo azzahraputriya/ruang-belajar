@@ -1,3 +1,8 @@
 {
-  "claudeMdExcludes": ["**/arra/CLAUDE.md", "**/arra/AGENTS.md", "**/arra/*/CLAUDE.md", "**/arra/*/AGENTS.md"]
+	"claudeMdExcludes": [
+		"**/arra/CLAUDE.md",
+		"**/arra/AGENTS.md",
+		"**/arra/*/CLAUDE.md",
+		"**/arra/*/AGENTS.md"
+	]
 }
