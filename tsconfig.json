@@ -1,5 +1,6 @@
 {
 	"include": ["**/*.ts", "**/*.tsx"],
+	"exclude": ["node_modules", ".claude/worktrees", "mocks"],
 	"compilerOptions": {
 		"target": "ES2022",
 		"jsx": "react-jsx",
