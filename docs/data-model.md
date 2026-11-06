@@ -1,18 +1,19 @@
 # Data model (draft)
 
-How Ruang Belajar stores schools, classes, lessons, and student work. This draft is for discussion, before any schema code.
+How Ruang Belajar stores accounts, classes, lessons, and student work. This draft is for discussion, before any schema code.
 
 ## Shape
 
 ```
-Organization (a school)
-├─ Member            org role: admin | teacher | student
-└─ Class             title, subject, joinCode, aiTutorEnabled
-   ├─ ClassMember    class role: teacher | student, aiConsentAt
-   └─ Module         position, opensAt, dueAt
-      └─ Step        position, kind (see below), content
-         └─ Question         quiz steps only, what students see
-            └─ QuestionKey   correct answer, feedback, solution steps
+User                 username, name, accountType: teacher | student
+Class                title, subject, aiTutorEnabled
+├─ ClassMember       class role: teacher | student, aiConsentAt
+├─ ClassInvite       invitee, role, status (see below)
+├─ Announcement      author, body, createdAt, editedAt
+└─ Module            position, opensAt, dueAt
+   └─ Step           position, kind (see below), content
+      └─ Question         quiz steps only, what students see
+         └─ QuestionKey   correct answer, feedback, solution steps
 
 Student work, one row per thing that happened:
   StepVisit       student opened or finished a step
@@ -23,14 +24,31 @@ Student work, one row per thing that happened:
   TutorMessage    role, text, input and output token counts
 ```
 
-`Organization` and `Member` come from the better-auth organization plugin. Everything else is ours.
+`User` and sessions come from better-auth with its username plugin. Everything else is ours.
 
-## Two kinds of role
+## Accounts and roles
 
-- The **org role** only decides who may create classes (admin and teacher).
-- The **class role** decides everything inside a class.
+- **Account type** decides one thing. Only `teacher` accounts can create a class. It is picked at sign-up.
+- **Class role** decides everything inside a class. A class can have several teachers. A teacher account can also be a student in someone else's class.
+- Every class query checks `ClassMember` first. No membership, no data.
 
-The same person can teach one class and take another. A class belongs to exactly one org, and every class query filters by org, so data never crosses schools.
+There are no schools or organizations. Each class stands alone, like a workspace. The class switcher lists the classes you belong to plus your pending invites. The last class you opened is kept in a cookie, not the database.
+
+## Login
+
+Username and password. better-auth still needs an email on every user, so sign-up fills in an address that can't receive mail (`<username>@users.ruang-belajar.invalid`). The tradeoff is no "forgot password" email. See the open question at the end.
+
+## Invites
+
+Classes are invite-only. A teacher invites an existing account by username, as `student` or `teacher`.
+
+| From | Action | To | Who |
+|---|---|---|---|
+| pending | accept | accepted | invitee |
+| pending | decline | declined | invitee |
+| pending | revoke | revoked | a class teacher |
+
+Accepting adds the `ClassMember` row in the same transaction. Accepting twice leaves the same result as once. At most one pending invite per class and user. A teacher can remove a member at any time. A class always keeps at least one teacher.
 
 ## Step kinds
 
@@ -76,17 +94,6 @@ The only stored status. Moves follow this table, nothing else.
 
 Lateness is computed from `submittedAt` and the module's `dueAt`.
 
-## Joining with a code
-
-The better-auth `addMember` call checks nothing by itself, so the join function owns every check:
-
-1. Require a signed-in user.
-2. Find the class by code. Reject unknown or disabled codes.
-3. Add the user to the org as `student`, unless they are already a member.
-4. Add the user to the class as `student`, unless they are already in it.
-
-Running it twice leaves the same result as running it once.
-
 ## AI tutor
 
 - Off unless the class turns it on (`aiTutorEnabled`) and the student agrees (`aiConsentAt`).
@@ -105,4 +112,8 @@ Uploads store a storage key, not a disk path. They can start on local disk and m
 
 ## Not in the first version
 
-Announcements, notifications, analytics, offline mode, grade weights, glossary, search.
+Comments on announcements, notifications, analytics, offline mode, grade weights, glossary, search.
+
+## Open questions
+
+- Forgotten passwords. With no real email there is no reset link. Options are a reset done by the site admin, or an optional recovery email.
