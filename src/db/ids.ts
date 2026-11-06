@@ -17,3 +17,6 @@ export type StepId = typeof StepId.infer;
 // better-auth makes its own ids, which are not uuids.
 export const UserId = type("string > 0").brand("UserId");
 export type UserId = typeof UserId.infer;
+
+export const QuestionId = type("string.uuid").brand("QuestionId");
+export type QuestionId = typeof QuestionId.infer;
