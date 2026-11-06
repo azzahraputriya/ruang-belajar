@@ -31,17 +31,15 @@ export const listModulesFn = createServerFn()
 	.validator(InClass)
 	.handler(async ({ data }) => listModules(await requireActor(), data.classId));
 
+// Module and step fields sit under `module` and `step`. Both inputs carry a narrow or a morph,
+// and ArkType's merge only takes plain objects.
 export const createModuleFn = createServerFn({ method: "POST" })
-	.validator(ModuleInput.merge(InClass))
-	.handler(async ({ data: { classId, ...input } }) =>
-		createModule(await requireActor(), classId, input),
-	);
+	.validator(InClass.merge({ module: ModuleInput }))
+	.handler(async ({ data }) => createModule(await requireActor(), data.classId, data.module));
 
 export const updateModuleFn = createServerFn({ method: "POST" })
-	.validator(ModuleInput.merge(ForModule))
-	.handler(async ({ data: { moduleId, ...input } }) =>
-		updateModule(await requireActor(), moduleId, input),
-	);
+	.validator(ForModule.merge({ module: ModuleInput }))
+	.handler(async ({ data }) => updateModule(await requireActor(), data.moduleId, data.module));
 
 export const deleteModuleFn = createServerFn({ method: "POST" })
 	.validator(ForModule)
@@ -55,7 +53,6 @@ export const getStepFn = createServerFn()
 	.validator(ForStep)
 	.handler(async ({ data }) => getStep(await requireActor(), data.stepId));
 
-// The step's own fields sit under `step`, because StepInput is a morph and can't be merged into another object.
 export const createStepFn = createServerFn({ method: "POST" })
 	.validator(ForModule.merge({ step: StepInput }))
 	.handler(async ({ data }) => createStep(await requireActor(), data.moduleId, data.step));

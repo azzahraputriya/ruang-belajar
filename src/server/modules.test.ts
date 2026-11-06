@@ -391,6 +391,27 @@ describe("order", () => {
 		expect(await moduleTitles(guru, classId)).toEqual(before);
 	});
 
+	it("two deletes of one step at once: one succeeds, the other is not_found", async () => {
+		const { guru, classId, moduleId, stepId } = await classWithStep();
+		await stepOk(guru, moduleId, reading("Kedua"));
+		const both = await Promise.all([deleteStep(guru, stepId), deleteStep(guru, stepId)]);
+		expect(both).toEqual(
+			expect.arrayContaining([{ ok: true }, { ok: false, reason: "not_found" }]),
+		);
+		expect(await moduleTitles(guru, classId)).toEqual([
+			{ title: "Bab 1", position: 0, steps: [["Kedua", 0]] },
+		]);
+	});
+
+	it("an edit racing a delete is ok or not_found, never kind_changed", async () => {
+		const { guru, stepId } = await classWithStep();
+		const [, edited] = await Promise.all([
+			deleteStep(guru, stepId),
+			updateStep(guru, stepId, reading("Diubah")),
+		]);
+		expect(edited.ok || edited.reason === "not_found").toBe(true);
+	});
+
 	it("accepts uppercase ids in a reorder", async () => {
 		const { guru, classId, moduleId } = await classWithStep();
 		const second = await moduleOk(guru, classId, "Bab 2");
@@ -471,6 +492,14 @@ describe("class progress", () => {
 				},
 			],
 		});
+	});
+});
+
+describe("server functions", () => {
+	// Nothing else loads this file yet, and a bad validator (e.g. merging a narrowed type) throws on import.
+	it("load, so every validator builds", async () => {
+		const fns = await import("#/server/module-fns");
+		expect(Object.keys(fns)).toContain("createModuleFn");
 	});
 });
 

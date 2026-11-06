@@ -92,7 +92,13 @@ async function writeStep(tx: Tx, actor: UserId, stepId: StepId) {
 		.where(eq(step.id, stepId));
 	if (!found) return NOT_FOUND;
 	const access = await writeModule(tx, actor, found.moduleId);
-	return access.ok ? { ...access, moduleId: found.moduleId } : access;
+	if (!access.ok) return access;
+	// Read again under the lock: a parallel delete may have removed it while we waited.
+	const [locked] = await tx
+		.select({ kind: step.kind, stepPosition: step.position })
+		.from(step)
+		.where(eq(step.id, stepId));
+	return locked ? { ...access, ...locked, moduleId: found.moduleId } : NOT_FOUND;
 }
 
 // Same as moduleFor, for the step's module, along with the step row.
@@ -236,12 +242,14 @@ export async function updateStep(actor: UserId, stepId: StepId, input: StepInput
 	return db.transaction(async (tx) => {
 		const access = await writeStep(tx, actor, stepId);
 		if (!access.ok) return access;
+		if (access.kind !== input.kind) return fail("kind_changed");
 		const [updated] = await tx
 			.update(step)
 			.set({ title: input.title, content: input.content })
-			.where(and(eq(step.id, stepId), eq(step.kind, input.kind)))
+			.where(eq(step.id, stepId))
 			.returning();
-		return updated ? ({ ok: true, step: toStep(updated) } as const) : fail("kind_changed");
+		if (!updated) throw new Error("Updating a locked step returned no row");
+		return { ok: true, step: toStep(updated) } as const;
 	});
 }
 
@@ -249,15 +257,11 @@ export async function deleteStep(actor: UserId, stepId: StepId) {
 	return db.transaction(async (tx) => {
 		const access = await writeStep(tx, actor, stepId);
 		if (!access.ok) return access;
-		const [deleted] = await tx
-			.delete(step)
-			.where(eq(step.id, stepId))
-			.returning({ position: step.position });
-		if (!deleted) throw new Error("Deleting a locked step returned no row");
+		await tx.delete(step).where(eq(step.id, stepId));
 		await tx
 			.update(step)
 			.set({ position: sql`${step.position} - 1` })
-			.where(and(eq(step.moduleId, access.moduleId), gt(step.position, deleted.position)));
+			.where(and(eq(step.moduleId, access.moduleId), gt(step.position, access.stepPosition)));
 		return OK;
 	});
 }
