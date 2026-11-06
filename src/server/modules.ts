@@ -1,4 +1,4 @@
-// Owns: every module, step, and step visit operation with its membership check and input rules, plus the progress queries. Not here: each kind's content shape and status rule (src/server/step-kinds.ts) or session wiring (src/server/module-fns.ts).
+// Owns: every module, step, and step visit operation with its membership check and input rules, the step access checks quizzes reuse, plus the progress queries. Not here: each kind's content shape and status rule (src/server/step-kinds.ts), quiz questions and attempts (src/server/quizzes.ts), or session wiring (src/server/module-fns.ts).
 
 import { type } from "arktype";
 import { type Column, and, asc, eq, gt, sql } from "drizzle-orm";
@@ -14,8 +14,9 @@ import {
 } from "#/db/content-schema";
 import { db } from "#/db/client";
 import type { ClassId, ModuleId, StepId, UserId } from "#/db/ids";
+import { quizAttempt } from "#/db/quiz-schema";
 import { type Conn, NOT_FOUND, OK, type Tx, fail, lockClass, roleIn } from "#/server/class-access";
-import { STEP_KINDS, parseStepContent, stepStatus } from "#/server/step-kinds";
+import { STEP_KINDS, type StepWork, parseStepContent, stepStatus } from "#/server/step-kinds";
 
 const Title = type("string.trim").to("1 <= string <= 200");
 
@@ -85,7 +86,7 @@ async function writeModule(tx: Tx, actor: UserId, moduleId: ModuleId) {
 }
 
 // writeModule for the module that holds this step.
-async function writeStep(tx: Tx, actor: UserId, stepId: StepId) {
+export async function writeStep(tx: Tx, actor: UserId, stepId: StepId) {
 	const [found] = await tx
 		.select({ moduleId: step.moduleId })
 		.from(step)
@@ -102,19 +103,24 @@ async function writeStep(tx: Tx, actor: UserId, stepId: StepId) {
 }
 
 // Same as moduleFor, for the step's module, along with the step row.
-async function stepFor(conn: Conn, actor: UserId, stepId: StepId) {
+export async function stepFor(conn: Conn, actor: UserId, stepId: StepId) {
 	const [found] = await conn.select().from(step).where(eq(step.id, stepId));
 	if (!found) return undefined;
 	const access = await moduleFor(conn, actor, found.moduleId);
 	return access && { ...access, step: found };
 }
 
-// Every read of a step goes through here, so the app never trusts raw jsonb.
-function toStep(row: typeof step.$inferSelect) {
+// Every read of step content goes through here, so the app never trusts raw jsonb.
+export function contentOf(row: Pick<typeof step.$inferSelect, "id" | "kind" | "content">) {
 	const parsed = parseStepContent(row.kind, row.content);
 	if (parsed instanceof type.errors) {
 		throw new Error(`Step ${row.id} has invalid ${row.kind} content: ${parsed.summary}`);
 	}
+	return parsed;
+}
+
+function toStep(row: typeof step.$inferSelect) {
+	const parsed = contentOf(row);
 	return {
 		id: row.id,
 		moduleId: row.moduleId,
@@ -128,7 +134,7 @@ export type Step = ReturnType<typeof toStep>;
 
 // The ordered list must be exactly the current ids, each once. Postgres returns uuids in lowercase,
 // and an uppercase uuid is still valid input, so both sides are lowercased before comparing.
-function sameIds(current: readonly string[], ordered: readonly string[]) {
+export function sameIds(current: readonly string[], ordered: readonly string[]) {
 	const have = new Set(current.map((id) => id.toLowerCase()));
 	const want = ordered.map((id) => id.toLowerCase());
 	return (
@@ -139,7 +145,7 @@ function sameIds(current: readonly string[], ordered: readonly string[]) {
 }
 
 // Each id's new position, as one CASE, so a reorder is a single UPDATE. Needs at least one id.
-const positionsIn = (idColumn: Column, orderedIds: readonly string[]) =>
+export const positionsIn = (idColumn: Column, orderedIds: readonly string[]) =>
 	sql`case ${idColumn} ${sql.join(
 		orderedIds.map((id, position) => sql`when ${id}::uuid then ${position}::int`),
 		sql` `,
@@ -287,21 +293,23 @@ export async function reorderSteps(actor: UserId, moduleId: ModuleId, orderedIds
 	});
 }
 
-// Every step in the class, in reading order, with its module's opening time.
+// Every step in the class, in reading order, with its module's opening time and parsed content.
 async function stepsInClass(classId: ClassId) {
-	return db
+	const rows = await db
 		.select({
 			id: step.id,
 			moduleId: step.moduleId,
 			kind: step.kind,
 			title: step.title,
 			position: step.position,
+			content: step.content,
 			opensAt: moduleTable.opensAt,
 		})
 		.from(step)
 		.innerJoin(moduleTable, eq(moduleTable.id, step.moduleId))
 		.where(eq(moduleTable.classId, classId))
 		.orderBy(asc(moduleTable.position), asc(step.position));
+	return rows.map((row) => Object.assign(row, { parsed: contentOf(row) }));
 }
 
 // Modules in order, each with its steps in order. Content stays out: getStep returns it.
@@ -347,30 +355,47 @@ export async function recordVisit(actor: UserId, stepId: StepId, event: VisitEve
 	return OK;
 }
 
-// Which events each student has on each step of the class, keyed by `${stepId}/${studentId}`.
-async function visitsInClass(classId: ClassId, studentId?: UserId) {
-	const rows = await db
-		.selectDistinct({
-			stepId: stepVisit.stepId,
-			studentId: stepVisit.studentId,
-			event: stepVisit.event,
-		})
-		.from(stepVisit)
-		.innerJoin(step, eq(step.id, stepVisit.stepId))
-		.innerJoin(moduleTable, eq(moduleTable.id, step.moduleId))
-		.where(
-			and(
-				eq(moduleTable.classId, classId),
-				studentId ? eq(stepVisit.studentId, studentId) : undefined,
-			),
-		);
+// What each student has done on each step of the class: the visit events, and the scores of their
+// quiz attempts. One student when `studentId` is given, everyone otherwise.
+async function workInClass(classId: ClassId, studentId?: UserId) {
+	const inClass = (student: Column) =>
+		and(eq(moduleTable.classId, classId), studentId ? eq(student, studentId) : undefined);
+	const [visitRows, attemptRows] = await Promise.all([
+		db
+			.selectDistinct({
+				stepId: stepVisit.stepId,
+				studentId: stepVisit.studentId,
+				event: stepVisit.event,
+			})
+			.from(stepVisit)
+			.innerJoin(step, eq(step.id, stepVisit.stepId))
+			.innerJoin(moduleTable, eq(moduleTable.id, step.moduleId))
+			.where(inClass(stepVisit.studentId)),
+		db
+			.select({
+				stepId: quizAttempt.stepId,
+				studentId: quizAttempt.studentId,
+				score: quizAttempt.score,
+			})
+			.from(quizAttempt)
+			.innerJoin(step, eq(step.id, quizAttempt.stepId))
+			.innerJoin(moduleTable, eq(moduleTable.id, step.moduleId))
+			.where(inClass(quizAttempt.studentId)),
+	]);
 	const visits = new Map<string, Set<VisitEvent>>();
-	for (const row of rows) {
+	for (const row of visitRows) {
 		const key = `${row.stepId}/${row.studentId}`;
 		visits.set(key, (visits.get(key) ?? new Set()).add(row.event));
 	}
-	const none: ReadonlySet<VisitEvent> = new Set();
-	return (stepId: StepId, student: UserId) => visits.get(`${stepId}/${student}`) ?? none;
+	const scores = new Map<string, number[]>();
+	for (const row of attemptRows) {
+		const key = `${row.stepId}/${row.studentId}`;
+		scores.set(key, [...(scores.get(key) ?? []), row.score]);
+	}
+	return (stepId: StepId, student: UserId): StepWork => ({
+		visits: visits.get(`${stepId}/${student}`) ?? new Set(),
+		scores: scores.get(`${stepId}/${student}`) ?? [],
+	});
 }
 
 // The acting student's status on every step they can see, in reading order.
@@ -379,13 +404,10 @@ export async function progressFor(actor: UserId, classId: ClassId) {
 	if (!role) return NOT_FOUND;
 	if (role !== "student") return fail("forbidden");
 	const now = new Date();
-	const [steps, visitsOf] = await Promise.all([
-		stepsInClass(classId),
-		visitsInClass(classId, actor),
-	]);
+	const [steps, workOf] = await Promise.all([stepsInClass(classId), workInClass(classId, actor)]);
 	const progress = steps
 		.filter((s) => visibleTo(role, s.opensAt, now))
-		.map((s) => ({ stepId: s.id, status: stepStatus(s.kind, { visits: visitsOf(s.id, actor) }) }));
+		.map((s) => ({ stepId: s.id, status: stepStatus(s.parsed, workOf(s.id, actor)) }));
 	return { ok: true, progress } as const;
 }
 
@@ -395,7 +417,7 @@ export async function classProgress(actor: UserId, classId: ClassId) {
 	const role = await roleIn(db, classId, actor);
 	if (!role) return NOT_FOUND;
 	if (role !== "teacher") return fail("forbidden");
-	const [students, steps, visitsOf] = await Promise.all([
+	const [students, steps, workOf] = await Promise.all([
 		db
 			.select({ userId: classMember.userId, username: user.username, name: user.name })
 			.from(classMember)
@@ -403,7 +425,7 @@ export async function classProgress(actor: UserId, classId: ClassId) {
 			.where(and(eq(classMember.classId, classId), eq(classMember.role, "student")))
 			.orderBy(asc(classMember.joinedAt)),
 		stepsInClass(classId),
-		visitsInClass(classId),
+		workInClass(classId),
 	]);
 	return {
 		ok: true,
@@ -412,7 +434,7 @@ export async function classProgress(actor: UserId, classId: ClassId) {
 			Object.assign(s, {
 				progress: steps.map((st) => ({
 					stepId: st.id,
-					status: stepStatus(st.kind, { visits: visitsOf(st.id, s.userId) }),
+					status: stepStatus(st.parsed, workOf(st.id, s.userId)),
 				})),
 			}),
 		),

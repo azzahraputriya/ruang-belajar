@@ -78,9 +78,31 @@ Each kind is one entry in `src/server/step-kinds.ts`: its content shape, whether
 
 Quiz questions are auto-graded only: single choice, multiple choice, number, short exact answer. Essays are an `assignment`. The old physics final test (8 choice + 7 essay) becomes one quiz step and one assignment step.
 
+## Quizzes
+
+`quiz` content is `maxAttempts` (1 to 10, default 3) and `passScore` (a whole percent, default 70). Questions are rows, not content. Each question kind is one entry in `src/server/question-kinds.ts`: its choices, key shape, answer shape, and grading rule.
+
+| Kind              | Key                                 | Right when                                                                  |
+| ----------------- | ----------------------------------- | --------------------------------------------------------------------------- |
+| `single_choice`   | one choice id                       | the same id                                                                 |
+| `multiple_choice` | one or more choice ids              | exactly the same set. No partial credit.                                    |
+| `number`          | `value` and an absolute `tolerance` | within `value ± tolerance`, with a tiny slack for floating-point error      |
+| `short_text`      | the text                            | equal after trimming, collapsing inner whitespace, and ignoring letter case |
+
+- A score is the percent of questions right, rounded down. With a whole-number pass score, rounding down never changes a pass. Unanswered questions count as wrong.
+- An answer of the wrong shape, or for a question that isn't in the quiz, refuses the whole attempt and stores nothing. A quiz with no questions can't be submitted.
+- The best attempt counts. A pass closes the quiz: no more attempts after it. Out of attempts below the pass score is `needs help`.
+- Attempt numbers are given out under the class lock, so two submits at once can't share a number or go past the limit. A unique index on (step, student, attempt number) is the backstop.
+- `maxAttempts` and `passScore` are read live. A teacher who lowers the pass score passes earlier attempts that now reach it. Raising `maxAttempts` reopens a quiz that ran out, even though its solutions were shown.
+- Editing or deleting a question doesn't regrade attempts already submitted.
+- Only students take quizzes. A teacher gets `forbidden` and edits through the teacher view, which includes the keys.
+
 ## Answer keys stay on the server
 
-`QuestionKey` is its own table. Code that loads a step for a student cannot select it by accident. Only grading and the AI tutor read it.
+`QuestionKey` is its own table, in its own schema file (`src/db/question-key-schema.ts`). It is left out of `src/db/schema.ts`, so the shared `db` client doesn't carry it, and the lint rule `ruang/question-key-server-only` lets only `src/server/quizzes.ts` (and later the AI tutor) import it. Only grading, the teacher's views, and the reveal below read it.
+
+- While attempts remain, a student sees only which questions they got right. Never the correct answer, the feedback, or the solution.
+- Once the quiz closes for them (passed, or out of attempts), they see the correct answer, feedback, and solution of every question.
 
 ## Status is computed, not stored
 

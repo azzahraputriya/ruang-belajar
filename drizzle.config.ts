@@ -9,7 +9,8 @@ if (!url) throw new Error("DATABASE_URL is not set. Copy .env.example to .env.")
 
 export default defineConfig({
 	dialect: "postgresql",
-	schema: "./src/db/schema.ts",
+	// The key table is listed on its own: src/db/schema.ts leaves it out so the app's db client never carries it.
+	schema: ["./src/db/schema.ts", "./src/db/question-key-schema.ts"],
 	out: "./drizzle",
 	dbCredentials: { url },
 });
