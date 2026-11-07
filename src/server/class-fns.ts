@@ -1,7 +1,7 @@
 // Owns: the server functions the class screens call, which find the signed-in user and parse input, the queries that cache them in the browser, plus the last-opened-class cookie and requireActor, which module-fns.ts shares. Not here: the class rules themselves (src/server/classes.ts).
 
 import { queryOptions } from "@tanstack/react-query";
-import { createServerFn } from "@tanstack/react-start";
+import { createServerFn, createServerOnlyFn } from "@tanstack/react-start";
 import { getCookie, getRequest, setCookie } from "@tanstack/react-start/server";
 import { type } from "arktype";
 import { ClassId, InviteId, UserId } from "#/db/ids";
@@ -27,11 +27,12 @@ import {
 } from "#/server/classes";
 
 // Screens that call these sit behind sign-in, so a missing session is a bug, not an expected result.
-export async function requireActor() {
+// Server-only, so a browser bundle that imports this file never pulls in the session code.
+export const requireActor = createServerOnlyFn(async () => {
 	const session = await auth.api.getSession({ headers: getRequest().headers });
 	if (!session) throw new Error("Not signed in");
 	return UserId.assert(session.user.id);
-}
+});
 
 const InClass = type({ classId: ClassId });
 const ForInvite = type({ inviteId: InviteId });
