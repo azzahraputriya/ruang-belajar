@@ -16,8 +16,8 @@ import { submissionFile } from "#/db/submission-schema";
 import { env } from "#/env";
 import { storage } from "#/server/file-storage";
 import { ModuleInput, StepInput, createModule, createStep, deleteStep } from "#/server/modules";
+import { FILE_LIMITS } from "#/lib/upload-limits";
 import {
-	FILE_LIMITS,
 	allowedType,
 	cleanFilename,
 	contentDisposition,

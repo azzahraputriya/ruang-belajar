@@ -9,6 +9,7 @@ import { StepReader } from "#/components/step-reader";
 import { ClassId, StepId } from "#/db/ids";
 import { modulesQuery, progressQuery, stepQuery } from "#/server/module-fns";
 import { quizQuery, teacherQuizQuery } from "#/server/quiz-fns";
+import { mySubmissionQuery } from "#/server/submission-fns";
 
 const classRoute = getRouteApi("/_app/kelas/$classId");
 
@@ -24,11 +25,15 @@ export const Route = createFileRoute("/_app/kelas/$classId/langkah/$stepId")({
 		]);
 		if (!modules.some((m) => m.id === step.moduleId)) throw notFound();
 		// A quiz's questions come from their own query: without keys for a student, with them for a teacher.
+		// A student's own submission does too.
+		const { loaderData } = await parentMatchPromise;
+		const role = loaderData?.cls.myRole;
 		if (step.kind === "quiz") {
-			const { loaderData } = await parentMatchPromise;
-			const role = loaderData?.cls.myRole;
 			if (role === "student") await queryClient.ensureQueryData(quizQuery(user.id, stepId));
 			if (role === "teacher") await queryClient.ensureQueryData(teacherQuizQuery(user.id, stepId));
+		}
+		if ((step.kind === "assignment" || step.kind === "reflection") && role === "student") {
+			await queryClient.ensureQueryData(mySubmissionQuery(user.id, stepId));
 		}
 		return { classId, stepId };
 	},

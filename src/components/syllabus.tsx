@@ -1,7 +1,7 @@
-// Owns: the syllabus tree beside the open step (desktop aside and phone bar), with each step's status or kind icon and the teacher's add links. Not here: the panes it links to (src/routes/_app/kelas/$classId/) or reading-order rules (src/lib/reading-order.ts).
+// Owns: the syllabus tree beside the open step (desktop aside and phone bar), with each step's status or kind icon, the teacher's add links, and their "Perlu dinilai" link. Not here: the panes it links to (src/routes/_app/kelas/$classId/) or reading-order rules (src/lib/reading-order.ts).
 
 import { Link, useLocation, useParams } from "@tanstack/react-router";
-import { Check, ChevronDown, Circle, CircleAlert, CircleDashed, Plus } from "lucide-react";
+import { Check, ChevronDown, Circle, CircleAlert, CircleDashed, Inbox, Plus } from "lucide-react";
 import { useState } from "react";
 import { KindIcon, STEP_KIND_LIST, STEP_KIND_UI } from "#/components/step-kinds-ui";
 import {
@@ -71,6 +71,8 @@ export type SyllabusProps = {
 	modules: readonly ModuleWithSteps[];
 	// Students only. Teachers see kind icons instead.
 	statusById: ReadonlyMap<StepId, StepStatus> | undefined;
+	// Teachers only: assignments handed in and waiting for a grade.
+	waiting?: number | undefined;
 };
 
 const statusOf = (props: SyllabusProps, stepId: StepId) =>
@@ -97,6 +99,20 @@ function SyllabusTree(props: SyllabusProps) {
 	const [now] = useState(() => new Date());
 	return (
 		<>
+			{teacher ? (
+				<Link
+					to="/kelas/$classId/nilai"
+					params={{ classId }}
+					className={`${ROW} mb-3`}
+					activeProps={ACTIVE}
+				>
+					<Inbox aria-hidden="true" className="size-3.5 shrink-0" />
+					<span className="flex-1">Perlu dinilai</span>
+					{props.waiting ? (
+						<span className="text-primary tabular-nums">{props.waiting}</span>
+					) : null}
+				</Link>
+			) : null}
 			{modules.map((m, i) => {
 				const heading = (
 					<>

@@ -1,14 +1,14 @@
-// Owns: every submission operation on assignment and reflection steps (a student's draft, submit, and own view, the teacher's list, return, and grade) with its membership check and input rules, plus the grade rules. Not here: the lifecycle table and lateness (src/server/submission-lifecycle.ts), file uploads (src/server/submission-files.ts), or session wiring (src/server/submission-fns.ts).
+// Owns: every submission operation on assignment and reflection steps (a student's draft, submit, and own view, the teacher's list, class-wide queue, return, and grade) with its membership check and input rules, plus the grade rules. Not here: the lifecycle table and lateness (src/server/submission-lifecycle.ts), file uploads (src/server/submission-files.ts), or session wiring (src/server/submission-fns.ts).
 
 import { type } from "arktype";
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, asc, count, eq, inArray } from "drizzle-orm";
 import { user } from "#/db/auth-schema.gen";
 import { classMember } from "#/db/class-schema";
 import { moduleTable, step } from "#/db/content-schema";
 import { db } from "#/db/client";
-import type { StepId, SubmissionId, UserId } from "#/db/ids";
+import type { ClassId, StepId, SubmissionId, UserId } from "#/db/ids";
 import { submission, submissionEvent, submissionFile } from "#/db/submission-schema";
-import { type Conn, NOT_FOUND, type Tx, fail, lockClass } from "#/server/class-access";
+import { type Conn, NOT_FOUND, type Tx, fail, lockClass, roleIn } from "#/server/class-access";
 import { contentOf, stepFor, writeStep } from "#/server/modules";
 import { type SubmissionDecision, decideSubmission, isLate } from "#/server/submission-lifecycle";
 import { Markdown, type Rubric, type StepContent } from "#/server/step-kinds";
@@ -380,4 +380,115 @@ export async function listSubmissions(actor: UserId, stepId: StepId) {
 			submission: r.submission ? (viewById.get(r.submission.id) ?? null) : null,
 		})),
 	} as const;
+}
+
+// The teacher's queue for a whole class: per assignment step, in syllabus order, the work handed in
+// and waiting for a grade, oldest first, and who hasn't handed in yet. Only current students count.
+// Reflections are left out: they are never graded, so nothing would ever clear them from a
+// "needs grading" list.
+export async function gradingQueue(actor: UserId, classId: ClassId) {
+	const role = await roleIn(db, classId, actor);
+	if (!role) return NOT_FOUND;
+	if (role !== "teacher") return fail("forbidden");
+	const inClass = and(eq(moduleTable.classId, classId), eq(step.kind, "assignment"));
+	const [steps, students, statuses, handedIn] = await Promise.all([
+		db
+			.select({
+				id: step.id,
+				kind: step.kind,
+				title: step.title,
+				content: step.content,
+				dueAt: moduleTable.dueAt,
+			})
+			.from(step)
+			.innerJoin(moduleTable, eq(moduleTable.id, step.moduleId))
+			.where(inClass)
+			.orderBy(asc(moduleTable.position), asc(step.position)),
+		db
+			.select({ userId: classMember.userId, username: user.username, name: user.name })
+			.from(classMember)
+			.innerJoin(user, eq(user.id, classMember.userId))
+			.where(and(eq(classMember.classId, classId), eq(classMember.role, "student")))
+			.orderBy(asc(user.username)),
+		// Only what "not handed in yet" needs, so drafts' and graded work's text stays in the database.
+		db
+			.select({
+				stepId: submission.stepId,
+				studentId: submission.studentId,
+				status: submission.status,
+			})
+			.from(submission)
+			.innerJoin(step, eq(step.id, submission.stepId))
+			.innerJoin(moduleTable, eq(moduleTable.id, step.moduleId))
+			.where(inClass),
+		db
+			.select({ submission })
+			.from(submission)
+			.innerJoin(step, eq(step.id, submission.stepId))
+			.innerJoin(moduleTable, eq(moduleTable.id, step.moduleId))
+			.where(and(inClass, eq(submission.status, "submitted")))
+			.orderBy(asc(submission.submittedAt)),
+	]);
+	const studentById = new Map(students.map((s) => [s.userId, s]));
+	const dueById = new Map(steps.map((s) => [s.id, s.dueAt]));
+	// One viewsOf for the whole class. Its lateness needs one due date, so it is worked out per step here.
+	const views = await viewsOf(
+		db,
+		handedIn.flatMap((r) => (studentById.has(r.submission.studentId) ? [r.submission] : [])),
+		null,
+	);
+	for (const view of views) view.late = isLate(view.submittedAt, dueById.get(view.stepId) ?? null);
+	const queue = steps.map((s) => {
+		const statusOf = new Map(
+			statuses.filter((r) => r.stepId === s.id).map((r) => [r.studentId, r.status]),
+		);
+		const parsed = contentOf(s);
+		return {
+			id: s.id,
+			title: s.title,
+			dueAt: s.dueAt,
+			rubric: parsed.kind === "assignment" ? parsed.content.rubric : undefined,
+			waiting: views.flatMap((view) => {
+				const st = view.stepId === s.id ? studentById.get(view.studentId) : undefined;
+				return st ? [{ ...st, submission: view }] : [];
+			}),
+			// No submission yet, or still a draft. Returned work is the student's to fix, not "not in".
+			notIn: students.flatMap((st) => {
+				const status = statusOf.get(st.userId);
+				return status === undefined || status === "draft"
+					? [{ ...st, draft: status === "draft" }]
+					: [];
+			}),
+		};
+	});
+	return { ok: true, steps: queue } as const;
+}
+
+// The header's "Perlu dinilai" number: assignment work handed in by current students and not graded
+// or returned yet. One count, so opening a class doesn't download the whole queue.
+export async function waitingCount(actor: UserId, classId: ClassId) {
+	const role = await roleIn(db, classId, actor);
+	if (!role) return NOT_FOUND;
+	if (role !== "teacher") return fail("forbidden");
+	const [row] = await db
+		.select({ waiting: count() })
+		.from(submission)
+		.innerJoin(step, eq(step.id, submission.stepId))
+		.innerJoin(moduleTable, eq(moduleTable.id, step.moduleId))
+		.innerJoin(
+			classMember,
+			and(
+				eq(classMember.userId, submission.studentId),
+				eq(classMember.classId, classId),
+				eq(classMember.role, "student"),
+			),
+		)
+		.where(
+			and(
+				eq(moduleTable.classId, classId),
+				eq(step.kind, "assignment"),
+				eq(submission.status, "submitted"),
+			),
+		);
+	return { ok: true, waiting: row?.waiting ?? 0 } as const;
 }

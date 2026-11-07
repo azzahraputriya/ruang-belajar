@@ -9,10 +9,13 @@ services:
     # Passes stop signals to node, so restarts don't wait for the 10 second kill.
     init: true
     env_file: .env.production
+    # Pinned to the volume below, so a missing or different value in .env.production can't put
+    # uploads on the container's own disk, where a rebuild would delete them.
+    environment:
+      UPLOAD_DIR: /app/data/uploads
     # Localhost only. The Cloudflare Tunnel is the only way in from outside.
     ports:
       - "127.0.0.1:3300:3000"
-    # Same path as UPLOAD_DIR in .env.production.
     volumes:
       - uploads:/app/data/uploads
     depends_on:

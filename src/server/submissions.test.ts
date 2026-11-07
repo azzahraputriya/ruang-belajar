@@ -1,4 +1,4 @@
-// Owns: tests for the submission lifecycle, grading, lateness, and submission status against the test database. Not here: file uploads (src/server/submission-files.test.ts) or test setup (src/test/).
+// Owns: tests for the submission lifecycle, grading, lateness, the teacher's class-wide queue, and submission status against the test database. Not here: file uploads (src/server/submission-files.test.ts) or test setup (src/test/).
 
 import { randomUUID } from "node:crypto";
 import { type } from "arktype";
@@ -22,13 +22,15 @@ import {
 	ReturnInput,
 	getMySubmission,
 	grade,
+	gradingQueue,
 	listSubmissions,
 	returnSubmission,
 	saveDraft,
 	submit,
+	waitingCount,
 } from "#/server/submissions";
 import { classWithStudent, inviteOk, makeUser } from "#/test/fixtures";
-import { acceptInvite } from "#/server/classes";
+import { acceptInvite, leaveClass } from "#/server/classes";
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -521,5 +523,78 @@ describe("who sees and moves submissions", () => {
 			ok: false,
 			reason: "not_a_submission_step",
 		});
+	});
+});
+
+describe("the class-wide queue", () => {
+	it("lists handed-in assignments per step for the teacher, and only current students", async () => {
+		const { guru, siswa, classId, stepId } = await classWithAssignment({ rubric: RUBRIC });
+		const refleksi = await stepIn(guru, classId, reflection());
+		const join = async (name: string) => {
+			const id = await makeUser(name);
+			await acceptInvite(id, await inviteOk(guru, classId, name));
+			return id;
+		};
+		const kedua = await join("kedua");
+		const ketiga = await join("ketiga");
+		const keluar = await join("keluar");
+		await submitted(siswa, stepId);
+		await saveDraft(kedua, stepId, draft("Belum selesai"));
+		await submitted(ketiga, refleksi, "Refleksiku");
+		await submitted(keluar, stepId);
+		await leaveClass(keluar, classId);
+		// Another class's work never shows up here.
+		const other = await classWithAssignment({ prefix: "lain" });
+		await submitted(other.siswa, other.stepId);
+
+		const queue = await gradingQueue(guru, classId);
+		if (!queue.ok) throw new Error(queue.reason);
+		// The reflection is left out: it is never graded, so it could never leave the queue.
+		expect(
+			queue.steps.map((s) => ({
+				id: s.id,
+				waiting: s.waiting.map((w) => w.username),
+				notIn: s.notIn.map((n) => `${n.username}${n.draft ? " (draf)" : ""}`),
+			})),
+		).toEqual([{ id: stepId, waiting: ["siswa"], notIn: ["kedua (draf)", "ketiga"] }]);
+		expect(queue.steps[0]?.rubric).toEqual(RUBRIC);
+		expect(await waitingCount(guru, classId)).toEqual({ ok: true, waiting: 1 });
+
+		const id = queue.steps[0]?.waiting[0]?.submission.id;
+		if (!id) throw new Error("no waiting submission");
+		await grade(guru, id, gradeInput({ points: { isi: 5, bahasa: 3 } }));
+		const after = await gradingQueue(guru, classId);
+		if (!after.ok) throw new Error(after.reason);
+		expect(after.steps[0]?.waiting).toEqual([]);
+		expect(await waitingCount(guru, classId)).toEqual({ ok: true, waiting: 0 });
+	});
+
+	it("judges lateness by each step's own due date", async () => {
+		const { guru, siswa, classId, stepId } = await classWithAssignment({
+			dueAt: new Date(Date.now() - DAY),
+		});
+		const onTime = await stepIn(guru, classId, assignment(), new Date(Date.now() + DAY));
+		await submitted(siswa, stepId);
+		await submitted(siswa, onTime);
+		const queue = await gradingQueue(guru, classId);
+		if (!queue.ok) throw new Error(queue.reason);
+		expect(queue.steps.map((s) => s.waiting.map((w) => w.submission.late))).toEqual([
+			[true],
+			[false],
+		]);
+	});
+
+	it("is the teacher's alone", async () => {
+		const { siswa, classId } = await classWithAssignment();
+		const luar = await makeUser("luar");
+		const answers = await Promise.all(
+			[gradingQueue, waitingCount].flatMap((read) => [read(siswa, classId), read(luar, classId)]),
+		);
+		expect(answers).toEqual([
+			{ ok: false, reason: "forbidden" },
+			{ ok: false, reason: "not_found" },
+			{ ok: false, reason: "forbidden" },
+			{ ok: false, reason: "not_found" },
+		]);
 	});
 });

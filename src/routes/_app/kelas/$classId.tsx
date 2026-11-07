@@ -11,6 +11,7 @@ import { ClassId } from "#/db/ids";
 import { ROLE_LABEL } from "#/lib/class-labels";
 import { getClassFn, membersQuery, setLastClassFn } from "#/server/class-fns";
 import { modulesQuery, progressQuery } from "#/server/module-fns";
+import { waitingCountQuery } from "#/server/submission-fns";
 
 export const Route = createFileRoute("/_app/kelas/$classId")({
 	// Every step click is a child navigation, which would rerun this loader. The class title and your
@@ -53,6 +54,8 @@ function ClassPage() {
 	const { data: members } = useSuspenseQuery(membersQuery(user.id, cls.id));
 	const { data: modules } = useSuspenseQuery(modulesQuery(user.id, cls.id));
 	const { data: statusById } = useQuery({ ...progressQuery(user.id, cls.id), enabled: student });
+	// Not awaited in the loader: the count can arrive after the page shows.
+	const { data: waiting } = useQuery({ ...waitingCountQuery(user.id, cls.id), enabled: !student });
 
 	// Set here, not in the loader: hovering a rail tile preloads the loader and must not count as opening.
 	// The cookie is only a hint, so a failed write is ignored.
@@ -60,7 +63,13 @@ function ClassPage() {
 		setLastClassFn({ data: { classId: cls.id } }).catch(() => undefined);
 	}, [cls.id]);
 
-	const syllabus: SyllabusProps = { classId: cls.id, teacher: !student, modules, statusById };
+	const syllabus: SyllabusProps = {
+		classId: cls.id,
+		teacher: !student,
+		modules,
+		statusById,
+		waiting,
+	};
 
 	return (
 		<div className="flex min-h-svh flex-col">
