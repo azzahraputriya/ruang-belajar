@@ -6,7 +6,7 @@ import { user } from "#/db/auth-schema.gen";
 import { type ClassRole, classInvite, classMember, classRole, classTable } from "#/db/class-schema";
 import { db } from "#/db/client";
 import { type ClassId, type InviteId, UserId } from "#/db/ids";
-import { Username } from "#/server/auth";
+import { Username } from "#/lib/sign-up-rules";
 import { NOT_FOUND, OK, fail, lockClass, roleIn } from "#/server/class-access";
 import { type InviteAction, decideInvite } from "#/server/invite-lifecycle";
 
