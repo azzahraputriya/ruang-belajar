@@ -6,17 +6,17 @@ This file is the roadmap. To pick up work, take the first phase that is `in prog
 
 ## Status
 
-| Phase                           | Status      | PRs                  |
-| ------------------------------- | ----------- | -------------------- |
-| 0. Repo setup                   | in review   | #1 to #5, release #6 |
-| 1. Accounts                     | in review   | #7, #11, #15         |
-| 2. Deploy                       | not started |                      |
-| 3. Classes and invites          | not started |                      |
-| 4. Content: modules and steps   | not started |                      |
-| 5. Quizzes                      | not started |                      |
-| 6. Assignments and grading      | not started |                      |
-| 7. Discussion and announcements | not started |                      |
-| 8. AI tutor                     | not started |                      |
+| Phase                           | Status      | PRs                       |
+| ------------------------------- | ----------- | ------------------------- |
+| 0. Repo setup                   | in review   | #1 to #5, release #6      |
+| 1. Accounts                     | in review   | #7, #11, #15, release #16 |
+| 2. Deploy                       | not started |                           |
+| 3. Classes and invites          | not started |                           |
+| 4. Content: modules and steps   | not started |                           |
+| 5. Quizzes                      | not started |                           |
+| 6. Assignments and grading      | not started |                           |
+| 7. Discussion and announcements | not started |                           |
+| 8. AI tutor                     | not started |                           |
 
 Phases 1 to 8 each end in a working, tested slice. Phase 2 can run alongside phase 3.
 
