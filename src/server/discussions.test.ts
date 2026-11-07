@@ -43,7 +43,7 @@ async function stepIn(teacher: UserId, classId: ClassId, content = {}, opensAt?:
 // A class with a teacher, two students, an outsider, and one discussion step.
 async function classWithDiscussion(content = {}) {
 	const people = await classWithStudent();
-	const teman = await makeUser("teman");
+	const teman = await makeUser("teman", "Teman Sekelas");
 	await acceptInvite(teman, await inviteOk(people.guru, people.classId, "teman"));
 	const stepId = await stepIn(people.guru, people.classId, content);
 	return { ...people, teman, stepId };
@@ -255,7 +255,7 @@ describe("editing and deleting", () => {
 		expect(deleted.id).toBe(own);
 		expect(deleted.deleted).toBe(true);
 		expect(replies.map((r) => !r.deleted && [r.authorName, r.body, r.mine])).toEqual([
-			["teman", "Balasan.", true],
+			["Teman Sekelas", "Balasan.", true],
 		]);
 	});
 });
@@ -277,7 +277,7 @@ describe("reading threads", () => {
 		);
 		expect(thread.mine).toBe(true);
 		expect(thread.replies.map((r) => !r.deleted && [r.authorName, r.body, r.mine])).toEqual([
-			["teman", "Satu-a.", false],
+			["Teman Sekelas", "Satu-a.", false],
 			["guru", "Satu-b.", false],
 		]);
 	});

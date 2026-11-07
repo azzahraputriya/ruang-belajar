@@ -31,16 +31,22 @@ async function bodiesFor(actor: UserId, classId: ClassId) {
 describe("announcements", () => {
 	it("show every member the class's announcements, newest first, with the author's name", async () => {
 		const { guru, siswa, classId } = await classWithStudent();
+		const rekan = await makeUser("rekan", "Bu Rina");
+		await acceptInvite(rekan, await inviteOk(guru, classId, "rekan", "teacher"));
 		await announceOk(guru, classId, "Pertama.");
 		await announceOk(guru, classId, "Kedua.");
-		await announceOk(guru, classId, "Ketiga.");
+		await announceOk(rekan, classId, "Ketiga.");
 		expect(await bodiesFor(siswa, classId)).toEqual(["Ketiga.", "Kedua.", "Pertama."]);
-		const result = await listAnnouncements(siswa, classId);
+		const result = await listAnnouncements(guru, classId);
 		if (!result.ok) throw new Error(result.reason);
 		expect(new Set(Object.keys(result.announcements[0] ?? {}))).toEqual(
-			new Set(["authorName", "body", "createdAt", "editedAt", "id"]),
+			new Set(["authorName", "body", "createdAt", "editedAt", "id", "mine"]),
 		);
-		expect(result.announcements[0]?.authorName).toBe("guru");
+		expect(result.announcements.map((a) => [a.authorName, a.mine])).toEqual([
+			["Bu Rina", false],
+			["guru", true],
+			["guru", true],
+		]);
 	});
 
 	it("keep another class's announcements out, and give outsiders nothing", async () => {

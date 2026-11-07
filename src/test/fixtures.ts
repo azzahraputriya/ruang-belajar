@@ -6,8 +6,8 @@ import { CreateClassInput, InviteInput, acceptInvite, createClass, invite } from
 
 const PASSWORD = "rahasia-123";
 
-export async function makeUser(username: string) {
-	const { response } = await signUp({ username, name: username, password: PASSWORD });
+export async function makeUser(username: string, name = username) {
+	const { response } = await signUp({ username, name, password: PASSWORD });
 	return UserId.assert(response.user.id);
 }
 

@@ -78,12 +78,14 @@ export async function deleteAnnouncement(actor: UserId, id: AnnouncementId) {
 	});
 }
 
-// Newest first. Only the author's display name leaves the server.
+// Newest first. Only the author's display name leaves the server, plus whether it is the actor,
+// so a screen knows which ones they may edit.
 export async function listAnnouncements(actor: UserId, classId: ClassId) {
 	if (!(await roleIn(db, classId, actor))) return NOT_FOUND;
-	const announcements = await db
+	const rows = await db
 		.select({
 			id: announcement.id,
+			authorId: announcement.authorId,
 			authorName: user.name,
 			body: announcement.body,
 			createdAt: announcement.createdAt,
@@ -93,5 +95,13 @@ export async function listAnnouncements(actor: UserId, classId: ClassId) {
 		.innerJoin(user, eq(user.id, announcement.authorId))
 		.where(eq(announcement.classId, classId))
 		.orderBy(desc(announcement.createdAt), desc(announcement.id));
+	const announcements = rows.map((row) => ({
+		id: row.id,
+		authorName: row.authorName,
+		mine: row.authorId === actor,
+		body: row.body,
+		createdAt: row.createdAt,
+		editedAt: row.editedAt,
+	}));
 	return { ok: true, announcements } as const;
 }
