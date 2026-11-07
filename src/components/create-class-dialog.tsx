@@ -50,7 +50,8 @@ export function CreateClassDialog({ trigger }: { trigger: React.ReactElement }) 
 
 	function onSubmit(event: React.FormEvent<HTMLFormElement>) {
 		event.preventDefault();
-		const raw = ClassForm.assert(Object.fromEntries(new FormData(event.currentTarget)));
+		const form = event.currentTarget;
+		const raw = ClassForm.assert(Object.fromEntries(new FormData(form)));
 		const input = { title: raw.title.trim(), subject: raw.subject.trim() };
 		const errors: Partial<Record<Field, string>> = {};
 		if (!input.title) errors.title = EMPTY.title;
@@ -59,7 +60,8 @@ export function CreateClassDialog({ trigger }: { trigger: React.ReactElement }) 
 		flushSync(() => setFieldErrors(errors));
 		const first = Object.keys(errors)[0];
 		if (first) {
-			document.getElementById(first)?.focus();
+			const field = form.elements.namedItem(first);
+			if (field instanceof HTMLElement) field.focus();
 			return;
 		}
 		create.mutate(input);

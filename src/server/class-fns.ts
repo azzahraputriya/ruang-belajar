@@ -112,13 +112,16 @@ export const setLastClassFn = createServerFn({ method: "POST" })
 		return { ok: true } as const;
 	});
 
-// Keys hold no user id, so sign-out clears the whole cache instead.
-export const myClassesQuery = queryOptions({
-	queryKey: ["classes"],
-	queryFn: () => listMyClassesFn(),
-});
+// Keyed by user, so whoever signs in next in this tab never sees the last user's cached classes.
+// Invalidate with the bare ["classes"] or ["invites"] prefix.
+export const myClassesQuery = (userId: string) =>
+	queryOptions({
+		queryKey: ["classes", userId],
+		queryFn: () => listMyClassesFn(),
+	});
 
-export const myInvitesQuery = queryOptions({
-	queryKey: ["invites"],
-	queryFn: () => listMyPendingInvitesFn(),
-});
+export const myInvitesQuery = (userId: string) =>
+	queryOptions({
+		queryKey: ["invites", userId],
+		queryFn: () => listMyPendingInvitesFn(),
+	});

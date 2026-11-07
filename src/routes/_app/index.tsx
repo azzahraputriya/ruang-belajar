@@ -8,8 +8,11 @@ import { getLastClassFn, myClassesQuery } from "#/server/class-fns";
 
 export const Route = createFileRoute("/_app/")({
 	beforeLoad: async ({ context }) => {
-		const last = await getLastClassFn();
-		const classId = last?.id ?? (await context.queryClient.fetchQuery(myClassesQuery))[0]?.id;
+		const [last, classes] = await Promise.all([
+			getLastClassFn(),
+			context.queryClient.fetchQuery(myClassesQuery(context.user.id)),
+		]);
+		const classId = last?.id ?? classes[0]?.id;
 		if (classId) throw redirect({ to: "/kelas/$classId", params: { classId } });
 	},
 	component: NoClasses,

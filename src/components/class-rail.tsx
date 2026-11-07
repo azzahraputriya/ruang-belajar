@@ -15,9 +15,9 @@ const TILE =
 
 const SIGN_OUT_FAILED = "Tidak bisa keluar sekarang. Coba lagi.";
 
-export function ClassRail({ user }: { user: { name: string } }) {
-	const { data: classes } = useSuspenseQuery(myClassesQuery);
-	const { data: invites } = useSuspenseQuery(myInvitesQuery);
+export function ClassRail({ user }: { user: { id: string; name: string } }) {
+	const { data: classes } = useSuspenseQuery(myClassesQuery(user.id));
+	const { data: invites } = useSuspenseQuery(myInvitesQuery(user.id));
 	const showInvite = useShowInvite();
 	const navigate = useNavigate();
 	const queryClient = useQueryClient();
@@ -27,10 +27,10 @@ export function ClassRail({ user }: { user: { name: string } }) {
 			const { error } = await authClient.signOut();
 			if (error) throw new Error(`Sign-out failed with status ${error.status}`);
 		},
-		// The cached classes belong to this user, so the next one to sign in must not see them.
+		// Leave first, so the rail unmounts before its queries are dropped and can't refetch without a session.
 		onSuccess: async () => {
-			queryClient.clear();
 			await navigate({ to: "/masuk" });
+			queryClient.clear();
 		},
 	});
 

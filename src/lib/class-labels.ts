@@ -5,11 +5,12 @@ import type { ClassRole } from "#/db/class-schema";
 export const ROLE_LABEL: Record<ClassRole, string> = { teacher: "Guru", student: "Siswa" };
 
 // "Fisika XI IPA 2" becomes "FX". Two letters stay readable in a 40px tile.
+// Array.from splits by character, so an emoji isn't cut in half.
 export function initials(title: string) {
 	return title
 		.split(/\s+/)
 		.filter(Boolean)
 		.slice(0, 2)
-		.map((word) => word[0]?.toUpperCase())
+		.map((word) => Array.from(word)[0]?.toUpperCase())
 		.join("");
 }

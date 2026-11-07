@@ -1,7 +1,7 @@
 // Owns: the pending-invite banner with Tolak and Terima, and which invite it shows (shared with the rail's invite tiles). Not here: the invite rules (src/server/classes.ts) or the rail (src/components/class-rail.tsx).
 
 import { useMutation, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
-import { useNavigate } from "@tanstack/react-router";
+import { useNavigate, useRouteContext } from "@tanstack/react-router";
 import { createContext, useContext, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { Button } from "#/components/ui/button";
@@ -40,11 +40,12 @@ export function useShowInvite() {
 	return focus.show;
 }
 
-type Answer = { inviteId: InviteId; accept: boolean };
+type Answer = { inviteId: InviteId; classTitle: string; accept: boolean };
 
 export function InviteBanner() {
 	const focus = useContext(InviteFocusContext);
-	const { data: invites } = useSuspenseQuery(myInvitesQuery);
+	const { user } = useRouteContext({ from: "/_app" });
+	const { data: invites } = useSuspenseQuery(myInvitesQuery(user.id));
 	const queryClient = useQueryClient();
 	const navigate = useNavigate();
 	const [error, setError] = useState("");
@@ -56,15 +57,18 @@ export function InviteBanner() {
 		mutationFn: ({ inviteId, accept }: Answer) =>
 			(accept ? acceptInviteFn : declineInviteFn)({ data: { inviteId } }),
 		onMutate: () => setError(""),
-		onSuccess: async (result, { accept }) => {
-			await queryClient.invalidateQueries({ queryKey: ["invites"] });
-			// A teacher can revoke the invite while it sits on screen.
+		onSuccess: async (result, { accept, classTitle }) => {
+			// A teacher can revoke the invite while it sits on screen. Name the class, since the banner moves on to the next invite.
 			if (!result.ok) {
-				setError("Undangan itu sudah tidak berlaku.");
+				setError(`Undangan ke ${classTitle} sudah tidak berlaku.`);
+				await queryClient.invalidateQueries({ queryKey: ["invites"] });
 				return;
 			}
+			await Promise.all([
+				queryClient.invalidateQueries({ queryKey: ["invites"] }),
+				accept && queryClient.invalidateQueries({ queryKey: ["classes"] }),
+			]);
 			if (!accept) return;
-			await queryClient.invalidateQueries({ queryKey: ["classes"] });
 			await navigate({ to: "/kelas/$classId", params: { classId: result.classId } });
 		},
 		onError: () => setError("Tidak bisa menjawab undangan sekarang. Coba lagi."),
@@ -93,14 +97,18 @@ export function InviteBanner() {
 							size="sm"
 							variant="ghost"
 							disabled={answer.isPending}
-							onClick={() => answer.mutate({ inviteId: invite.id, accept: false })}
+							onClick={() =>
+								answer.mutate({ inviteId: invite.id, classTitle: invite.classTitle, accept: false })
+							}
 						>
 							Tolak
 						</Button>
 						<Button
 							size="sm"
 							disabled={answer.isPending}
-							onClick={() => answer.mutate({ inviteId: invite.id, accept: true })}
+							onClick={() =>
+								answer.mutate({ inviteId: invite.id, classTitle: invite.classTitle, accept: true })
+							}
 						>
 							Terima
 						</Button>

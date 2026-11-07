@@ -12,10 +12,10 @@ export const Route = createFileRoute("/_app")({
 		if (!user) throw redirect({ to: "/masuk" });
 		return { user };
 	},
-	loader: ({ context }) =>
+	loader: ({ context: { queryClient, user } }) =>
 		Promise.all([
-			context.queryClient.ensureQueryData(myClassesQuery),
-			context.queryClient.ensureQueryData(myInvitesQuery),
+			queryClient.ensureQueryData(myClassesQuery(user.id)),
+			queryClient.ensureQueryData(myInvitesQuery(user.id)),
 		]),
 	component: AppShell,
 });
