@@ -14,6 +14,10 @@ export type StepWork = {
 	scores: readonly number[];
 	// The status of their assignment or reflection submission. Null when there is none.
 	submission: SubmissionStatus | null;
+	// Their discussion posts that count: thread starters, and replies to someone else's thread.
+	// Deleted ones don't count. Zero for other kinds.
+	posts: number;
+	replies: number;
 };
 
 type StepKindSpec = {
@@ -95,6 +99,28 @@ const STATUS_OF_SUBMISSION = {
 	graded: "graded",
 } as const satisfies Record<SubmissionStatus, StepStatus>;
 
+// Required counts are read live, like quiz settings: a teacher raising them moves a done student
+// back to in progress. At least one is above zero, so done always means the student wrote something.
+const DiscussionContent = type({
+	"+": "delete",
+	prompt: Markdown,
+	requiredPosts: ["0 <= number.integer <= 10", "=", 1],
+	requiredReplies: ["0 <= number.integer <= 10", "=", 0],
+}).narrow(
+	(c, ctx) =>
+		c.requiredPosts > 0 ||
+		c.requiredReplies > 0 ||
+		ctx.mustBe("requiring a post, a reply, or both"),
+);
+type DiscussionContent = typeof DiscussionContent.infer;
+
+function discussionStatus(work: StepWork, content: DiscussionContent): StepStatus {
+	const { posts, replies, visits } = work;
+	if (posts >= content.requiredPosts && replies >= content.requiredReplies) return "done";
+	if (posts > 0 || replies > 0 || visits.size > 0) return "in_progress";
+	return "not_started";
+}
+
 // Shared by assignments and reflections. A reflection is never graded, so it never reaches "graded".
 function statusFromSubmission({ submission, visits }: StepWork): StepStatus {
 	if (submission) return STATUS_OF_SUBMISSION[submission];
@@ -131,6 +157,12 @@ export const STEP_KINDS = {
 		content: type({ "+": "delete", prompt: Markdown }),
 		finishedByStudent: false,
 		status: statusFromSubmission,
+	},
+	// Posts live in their own table (src/db/discussion-schema.ts), not in content.
+	discussion: {
+		content: DiscussionContent,
+		finishedByStudent: false,
+		status: discussionStatus,
 	},
 } as const satisfies Record<StepKind, StepKindSpec>;
 

@@ -12,6 +12,7 @@ export const stepKind = pgEnum("step_kind", [
 	"quiz",
 	"assignment",
 	"reflection",
+	"discussion",
 ]);
 export type StepKind = (typeof stepKind.enumValues)[number];
 
