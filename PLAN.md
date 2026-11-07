@@ -6,17 +6,17 @@ This file is the roadmap. To pick up work, take the first phase that is `in prog
 
 ## Status
 
-| Phase                           | Status      | PRs                  |
-| ------------------------------- | ----------- | -------------------- |
-| 0. Repo setup                   | in review   | #1 to #5, release #6 |
-| 1. Accounts                     | in progress |                      |
-| 2. Deploy                       | in progress |                      |
-| 3. Classes and invites          | not started |                      |
-| 4. Content: modules and steps   | not started |                      |
-| 5. Quizzes                      | not started |                      |
-| 6. Assignments and grading      | not started |                      |
-| 7. Discussion and announcements | not started |                      |
-| 8. AI tutor                     | not started |                      |
+| Phase                           | Status      | PRs                       |
+| ------------------------------- | ----------- | ------------------------- |
+| 0. Repo setup                   | done        | #1 to #5, release #6      |
+| 1. Accounts                     | done        | #7, #11, #15, release #16 |
+| 2. Deploy                       | in progress | #8, #14                   |
+| 3. Classes and invites          | in progress | #9, #18                   |
+| 4. Content: modules and steps   | in progress | #10                       |
+| 5. Quizzes                      | in progress | #12                       |
+| 6. Assignments and grading      | in progress | #13                       |
+| 7. Discussion and announcements | in progress | #17                       |
+| 8. AI tutor                     | not started |                           |
 
 Phases 1 to 8 each end in a working, tested slice. Phase 2 can run alongside phase 3.
 
@@ -109,7 +109,10 @@ Settled by Afief, with the reason where it isn't obvious:
 - **The UI is in Bahasa Indonesia.**
 - **Tests use Vitest,** with database tests against a real Postgres container.
 - **Data fetching uses TanStack Start server functions with TanStack Query.**
-- **Domain.** Probably `lms.afiefabd.com`. Confirm with Afief before adding the DNS record.
+- **Domain.** `lms.afiefabd.com`, confirmed by Afief. Live through the existing tunnel since 07 November 2026.
+- **Hosting.** The whole app runs on the VPS, not Vercel (Afief, 07 November 2026). Vercel would have to reach Postgres over the internet, which needs an open port, and the app's server code runs next to its pages.
+- **Sign-in and sign-up screens.** Mock B, a split screen with a blue panel (Afief, 07 November 2026).
+- **Class switcher.** Mock B, a Slack-style rail of class tiles (Afief, 07 November 2026).
 - **No backups for now.** Accepted risk: if the VPS disk or the Postgres volume is lost, all accounts and class data are lost.
 - **Consent.** The tutor sends student work to an outside AI service, which counts as personal data under UU PDP (Law No. 27/2022). Afief approves the consent text and its stated purpose.
 
