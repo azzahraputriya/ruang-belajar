@@ -14,6 +14,7 @@ import { Route as AuthRouteImport } from './routes/_auth'
 import { Route as AppIndexRouteImport } from './routes/_app/index'
 import { Route as AuthDaftarRouteImport } from './routes/_auth/daftar'
 import { Route as AuthMasukRouteImport } from './routes/_auth/masuk'
+import { Route as AppKelasClassIdRouteImport } from './routes/_app/kelas/$classId'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 
 const AppRoute = AppRouteImport.update({
@@ -39,6 +40,11 @@ const AuthMasukRoute = AuthMasukRouteImport.update({
   path: '/masuk',
   getParentRoute: () => AuthRoute,
 } as any)
+const AppKelasClassIdRoute = AppKelasClassIdRouteImport.update({
+  id: '/kelas/$classId',
+  path: '/kelas/$classId',
+  getParentRoute: () => AppRoute,
+} as any)
 const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   id: '/api/auth/$',
   path: '/api/auth/$',
@@ -49,12 +55,14 @@ export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
   '/daftar': typeof AuthDaftarRoute
   '/masuk': typeof AuthMasukRoute
+  '/kelas/$classId': typeof AppKelasClassIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
 }
 export interface FileRoutesByTo {
   '/': typeof AppIndexRoute
   '/daftar': typeof AuthDaftarRoute
   '/masuk': typeof AuthMasukRoute
+  '/kelas/$classId': typeof AppKelasClassIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
 }
 export interface FileRoutesById {
@@ -64,13 +72,14 @@ export interface FileRoutesById {
   '/_auth/daftar': typeof AuthDaftarRoute
   '/_auth/masuk': typeof AuthMasukRoute
   '/_app/': typeof AppIndexRoute
+  '/_app/kelas/$classId': typeof AppKelasClassIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/daftar' | '/masuk' | '/api/auth/$'
+  fullPaths: '/' | '/daftar' | '/masuk' | '/kelas/$classId' | '/api/auth/$'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/daftar' | '/masuk' | '/api/auth/$'
+  to: '/' | '/daftar' | '/masuk' | '/kelas/$classId' | '/api/auth/$'
   id:
     | '__root__'
     | '/_app'
@@ -78,6 +87,7 @@ export interface FileRouteTypes {
     | '/_auth/daftar'
     | '/_auth/masuk'
     | '/_app/'
+    | '/_app/kelas/$classId'
     | '/api/auth/$'
   fileRoutesById: FileRoutesById
 }
@@ -124,6 +134,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthMasukRouteImport
       parentRoute: typeof AuthRoute
     }
+    '/_app/kelas/$classId': {
+      id: '/_app/kelas/$classId'
+      path: '/kelas/$classId'
+      fullPath: '/kelas/$classId'
+      preLoaderRoute: typeof AppKelasClassIdRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/api/auth/$': {
       id: '/api/auth/$'
       path: '/api/auth/$'
@@ -136,10 +153,12 @@ declare module '@tanstack/react-router' {
 
 interface AppRouteChildren {
   AppIndexRoute: typeof AppIndexRoute
+  AppKelasClassIdRoute: typeof AppKelasClassIdRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
   AppIndexRoute: AppIndexRoute,
+  AppKelasClassIdRoute: AppKelasClassIdRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)

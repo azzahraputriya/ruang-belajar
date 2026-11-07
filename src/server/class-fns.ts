@@ -1,5 +1,6 @@
-// Owns: the server functions the class screens call, which find the signed-in user and parse input, plus the last-opened-class cookie and requireActor, which module-fns.ts shares. Not here: the class rules themselves (src/server/classes.ts).
+// Owns: the server functions the class screens call, which find the signed-in user and parse input, the queries that cache them in the browser, plus the last-opened-class cookie and requireActor, which module-fns.ts shares. Not here: the class rules themselves (src/server/classes.ts).
 
+import { queryOptions } from "@tanstack/react-query";
 import { createServerFn } from "@tanstack/react-start";
 import { getCookie, getRequest, setCookie } from "@tanstack/react-start/server";
 import { type } from "arktype";
@@ -109,4 +110,18 @@ export const setLastClassFn = createServerFn({ method: "POST" })
 			maxAge: 60 * 60 * 24 * 365,
 		});
 		return { ok: true } as const;
+	});
+
+// Keyed by user, so whoever signs in next in this tab never sees the last user's cached classes.
+// Invalidate with the bare ["classes"] or ["invites"] prefix.
+export const myClassesQuery = (userId: string) =>
+	queryOptions({
+		queryKey: ["classes", userId],
+		queryFn: () => listMyClassesFn(),
+	});
+
+export const myInvitesQuery = (userId: string) =>
+	queryOptions({
+		queryKey: ["invites", userId],
+		queryFn: () => listMyPendingInvitesFn(),
 	});
