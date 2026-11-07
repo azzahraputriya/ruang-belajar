@@ -1,3 +1,5 @@
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { defineConfig } from "vitest/config";
 
 const databaseUrl =
@@ -15,6 +17,8 @@ export default defineConfig({
 			DATABASE_URL: databaseUrl,
 			BETTER_AUTH_SECRET: "test-only-secret-0123456789abcdef",
 			BETTER_AUTH_URL: "http://localhost:3000",
+			// A fresh folder per run, so tests never touch real uploads.
+			UPLOAD_DIR: join(tmpdir(), `ruang-uploads-test-${process.pid}`),
 		},
 		globalSetup: ["src/test/global-setup.ts"],
 		setupFiles: ["src/test/setup.ts"],

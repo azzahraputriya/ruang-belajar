@@ -1,7 +1,7 @@
 // Owns: every module, step, and step visit operation with its membership check and input rules, the step access checks quizzes reuse, plus the progress queries. Not here: each kind's content shape and status rule (src/server/step-kinds.ts), quiz questions and attempts (src/server/quizzes.ts), or session wiring (src/server/module-fns.ts).
 
 import { type } from "arktype";
-import { type Column, and, asc, eq, gt, sql } from "drizzle-orm";
+import { type Column, type SQL, and, asc, eq, gt, sql } from "drizzle-orm";
 import { user } from "#/db/auth-schema.gen";
 import { type ClassRole, classMember } from "#/db/class-schema";
 import {
@@ -13,10 +13,11 @@ import {
 	visitEvent,
 } from "#/db/content-schema";
 import { db } from "#/db/client";
-import type { ClassId, ModuleId, StepId, UserId } from "#/db/ids";
+import type { ClassId, ModuleId, StepId, StorageKey, UserId } from "#/db/ids";
 import { quizAttempt } from "#/db/quiz-schema";
-import { submission } from "#/db/submission-schema";
+import { submission, submissionFile } from "#/db/submission-schema";
 import { type Conn, NOT_FOUND, OK, type Tx, fail, lockClass, roleIn } from "#/server/class-access";
+import { storage } from "#/server/file-storage";
 import { STEP_KINDS, type StepWork, parseStepContent, stepStatus } from "#/server/step-kinds";
 
 const Title = type("string.trim").to("1 <= string <= 200");
@@ -60,6 +61,7 @@ async function moduleFor(conn: Conn, actor: UserId, moduleId: ModuleId) {
 		.select({
 			classId: moduleTable.classId,
 			opensAt: moduleTable.opensAt,
+			dueAt: moduleTable.dueAt,
 			position: moduleTable.position,
 		})
 		.from(moduleTable)
@@ -186,10 +188,28 @@ export async function updateModule(actor: UserId, moduleId: ModuleId, input: Mod
 	});
 }
 
+// The storage keys of every file handed in on the matching steps. Read before a delete cascades
+// their rows away, so the bytes can be removed from disk after it commits.
+async function uploadsUnder(tx: Tx, stepsWhere: SQL) {
+	const rows = await tx
+		.select({ key: submissionFile.storageKey })
+		.from(submissionFile)
+		.innerJoin(submission, eq(submission.id, submissionFile.submissionId))
+		.innerJoin(step, eq(step.id, submission.stepId))
+		.where(stepsWhere);
+	return rows.map((r) => r.key);
+}
+
+// shortcut: a crash between the commit and this leaves the bytes on disk with no row. Add a sweep of unknown keys if disk gets tight.
+async function removeUploads(keys: readonly StorageKey[]) {
+	await Promise.all(keys.map((key) => storage.remove(key)));
+}
+
 export async function deleteModule(actor: UserId, moduleId: ModuleId) {
-	return db.transaction(async (tx) => {
+	const done = await db.transaction(async (tx) => {
 		const access = await writeModule(tx, actor, moduleId);
 		if (!access.ok) return access;
+		const keys = await uploadsUnder(tx, eq(step.moduleId, moduleId));
 		await tx.delete(moduleTable).where(eq(moduleTable.id, moduleId));
 		await tx
 			.update(moduleTable)
@@ -197,8 +217,11 @@ export async function deleteModule(actor: UserId, moduleId: ModuleId) {
 			.where(
 				and(eq(moduleTable.classId, access.classId), gt(moduleTable.position, access.position)),
 			);
-		return OK;
+		return { ok: true, keys } as const;
 	});
+	if (!done.ok) return done;
+	await removeUploads(done.keys);
+	return OK;
 }
 
 export async function reorderModules(actor: UserId, classId: ClassId, orderedIds: ModuleId[]) {
@@ -261,16 +284,20 @@ export async function updateStep(actor: UserId, stepId: StepId, input: StepInput
 }
 
 export async function deleteStep(actor: UserId, stepId: StepId) {
-	return db.transaction(async (tx) => {
+	const done = await db.transaction(async (tx) => {
 		const access = await writeStep(tx, actor, stepId);
 		if (!access.ok) return access;
+		const keys = await uploadsUnder(tx, eq(step.id, stepId));
 		await tx.delete(step).where(eq(step.id, stepId));
 		await tx
 			.update(step)
 			.set({ position: sql`${step.position} - 1` })
 			.where(and(eq(step.moduleId, access.moduleId), gt(step.position, access.stepPosition)));
-		return OK;
+		return { ok: true, keys } as const;
 	});
+	if (!done.ok) return done;
+	await removeUploads(done.keys);
+	return OK;
 }
 
 export async function reorderSteps(actor: UserId, moduleId: ModuleId, orderedIds: StepId[]) {
