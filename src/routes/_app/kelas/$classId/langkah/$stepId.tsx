@@ -38,8 +38,8 @@ function StepPane() {
 	const { data: statusById } = useQuery({ ...progressQuery(user.id, classId), enabled: student });
 
 	const module = modules.find((m) => m.id === step.moduleId);
-	// Gone after a refetch, e.g. its module was deleted.
-	if (!module) return <PaneMessage title="Langkah tidak ditemukan." />;
+	// Gone after a refetch: deleted here, just before leaving for the class index, or in another tab.
+	if (!module) return null;
 	if (student) {
 		return (
 			<StepReader
@@ -52,6 +52,6 @@ function StepPane() {
 		);
 	}
 	return (
-		<StepEditor key={step.id} userId={user.id} classId={classId} step={step} dueAt={module.dueAt} />
+		<StepEditor key={step.id} userId={user.id} classId={classId} step={step} module={module} />
 	);
 }

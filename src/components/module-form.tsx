@@ -1,15 +1,27 @@
-// Owns: the teacher's module editor (title, opens at, due at, client checks) and the wiring that creates or updates a module through it. Not here: the module rules (src/server/modules.ts) or WIB conversion (src/lib/wib.ts).
+// Owns: the teacher's module editor (title, opens at, due at, client checks) and the wiring that creates, updates, moves, or deletes a module through it. Not here: the module rules (src/server/modules.ts) or WIB conversion (src/lib/wib.ts).
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { flushSync } from "react-dom";
-import { EditorBar } from "#/components/editor-parts";
+import {
+	DeleteButton,
+	EditorBar,
+	MoveButtons,
+	UnsavedChangesGuard,
+} from "#/components/editor-parts";
 import { FormField } from "#/components/form-field";
 import type { FieldErrors } from "#/components/step-kinds-ui";
-import type { ClassId } from "#/db/ids";
+import type { ClassId, ModuleId } from "#/db/ids";
 import { fromWibInput, toWibInput } from "#/lib/wib";
-import { type ModuleWithSteps, createModuleFn, orThrow, updateModuleFn } from "#/server/module-fns";
+import {
+	type ModuleWithSteps,
+	createModuleFn,
+	deleteModuleFn,
+	orThrow,
+	reorderModulesFn,
+	updateModuleFn,
+} from "#/server/module-fns";
 
 // Dates stay as the inputs' "YYYY-MM-DDTHH:mm" strings while editing, "" meaning none.
 type Draft = { title: string; opensAt: string; dueAt: string };
@@ -79,6 +91,7 @@ function ModuleForm({ heading, initial, onSave, actions, actionFailed }: ModuleF
 			onSubmit={onSubmit}
 			className="mx-auto grid max-w-3xl gap-5 px-4 py-6 md:px-8"
 		>
+			<UnsavedChangesGuard dirty={dirty} />
 			<EditorBar
 				dirty={dirty}
 				save={save}
@@ -141,14 +154,38 @@ export function NewModule({ classId }: { classId: ClassId }) {
 	);
 }
 
-type ModuleEditorProps = { classId: ClassId; module: ModuleWithSteps; number: number };
+type ModuleEditorProps = {
+	classId: ClassId;
+	module: ModuleWithSteps;
+	// Every module of the class, in order, for moving and numbering.
+	modules: readonly ModuleWithSteps[];
+};
 
 // Render with key={module.id}, so the form starts from the module it shows.
-export function ModuleEditor({ module, number }: ModuleEditorProps) {
+export function ModuleEditor({ classId, module, modules }: ModuleEditorProps) {
 	const queryClient = useQueryClient();
+	const navigate = useNavigate();
+	const ids = modules.map((m) => m.id);
+
+	// Settled either way: a refetch shows the real order, and an ids_mismatch is not retried.
+	const move = useMutation({
+		mutationFn: async (orderedIds: ModuleId[]) =>
+			orThrow(await reorderModulesFn({ data: { classId, orderedIds } })),
+		onSettled: () => queryClient.invalidateQueries({ queryKey: ["modules"] }),
+	});
+
+	// The syllabus refetches before leaving, so the class index can't resume inside this module.
+	const remove = useMutation({
+		mutationFn: async () => orThrow(await deleteModuleFn({ data: { moduleId: module.id } })),
+		onSuccess: async () => {
+			await queryClient.invalidateQueries({ queryKey: ["modules"] });
+			await navigate({ to: "/kelas/$classId", params: { classId }, ignoreBlocker: true });
+		},
+	});
+
 	return (
 		<ModuleForm
-			heading={`Modul ${number}`}
+			heading={`Modul ${ids.indexOf(module.id) + 1}`}
 			initial={{
 				title: module.title,
 				opensAt: toWibInput(module.opensAt),
@@ -158,6 +195,24 @@ export function ModuleEditor({ module, number }: ModuleEditorProps) {
 				orThrow(await updateModuleFn({ data: { moduleId: module.id, module: value } }));
 				await queryClient.invalidateQueries({ queryKey: ["modules"] });
 			}}
+			actionFailed={move.isError || remove.isError}
+			actions={
+				<>
+					<MoveButtons
+						ids={ids}
+						id={module.id}
+						what="modul"
+						pending={move.isPending}
+						onMove={(orderedIds) => move.mutate(orderedIds)}
+					/>
+					<DeleteButton
+						what="modul"
+						consequence={`Semua langkahnya (${module.steps.length}) dan catatan baca siswa ikut terhapus.`}
+						pending={remove.isPending}
+						onConfirm={() => remove.mutate()}
+					/>
+				</>
+			}
 		/>
 	);
 }

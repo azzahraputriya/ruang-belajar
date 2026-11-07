@@ -33,9 +33,8 @@ function ModulePane() {
 	const { classId, moduleId } = Route.useLoaderData();
 	const { user } = Route.useRouteContext();
 	const { data: modules } = useSuspenseQuery(modulesQuery(user.id, classId));
-	const at = modules.findIndex((m) => m.id === moduleId);
-	const module = modules[at];
-	// Gone after a refetch, e.g. deleted in another tab.
-	if (!module) return <PaneMessage title="Modul tidak ditemukan." />;
-	return <ModuleEditor key={module.id} classId={classId} module={module} number={at + 1} />;
+	const module = modules.find((m) => m.id === moduleId);
+	// Gone after a refetch: deleted here, just before leaving for the class index, or in another tab.
+	if (!module) return null;
+	return <ModuleEditor key={module.id} classId={classId} module={module} modules={modules} />;
 }

@@ -1,10 +1,15 @@
-// Owns: the teacher's step editor (Tulis and Pratinjau, title and kind fields, client checks) and the wiring that creates or updates a step through it. Not here: each kind's fields and view (src/components/step-kinds-ui.tsx) or the student's reader (src/components/step-reader.tsx).
+// Owns: the teacher's step editor (Tulis and Pratinjau, title and kind fields, client checks) and the wiring that creates, updates, moves, or deletes a step through it. Not here: each kind's fields and view (src/components/step-kinds-ui.tsx) or the student's reader (src/components/step-reader.tsx).
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { flushSync } from "react-dom";
-import { EditorBar } from "#/components/editor-parts";
+import {
+	DeleteButton,
+	EditorBar,
+	MoveButtons,
+	UnsavedChangesGuard,
+} from "#/components/editor-parts";
 import { FormField } from "#/components/form-field";
 import { StepArticle } from "#/components/step-reader";
 import {
@@ -15,8 +20,15 @@ import {
 	STEP_KIND_UI,
 } from "#/components/step-kinds-ui";
 import type { StepKind } from "#/db/content-schema";
-import type { ClassId, ModuleId } from "#/db/ids";
-import { createStepFn, orThrow, updateStepFn } from "#/server/module-fns";
+import type { ClassId, ModuleId, StepId } from "#/db/ids";
+import {
+	type ModuleWithSteps,
+	createStepFn,
+	deleteStepFn,
+	orThrow,
+	reorderStepsFn,
+	updateStepFn,
+} from "#/server/module-fns";
 import type { Step } from "#/server/modules";
 
 type Draft<K extends StepKind> = { title: string; content: ContentOf<K> };
@@ -77,6 +89,7 @@ export function StepForm<K extends StepKind>(props: StepFormProps<K>) {
 
 	return (
 		<form method="post" noValidate onSubmit={onSubmit}>
+			<UnsavedChangesGuard dirty={dirty} />
 			<div className="mx-auto max-w-3xl px-4 pt-6 md:px-8">
 				<EditorBar
 					dirty={dirty}
@@ -136,16 +149,41 @@ export function StepForm<K extends StepKind>(props: StepFormProps<K>) {
 	);
 }
 
-type StepEditorProps = { userId: string; classId: ClassId; step: Step; dueAt: Date | null };
+type StepEditorProps = {
+	userId: string;
+	classId: ClassId;
+	step: Step;
+	module: ModuleWithSteps;
+};
 
 // Render with key={step.id}, so the form starts from the step it shows.
-export function StepEditor({ userId, step, dueAt }: StepEditorProps) {
+export function StepEditor({ userId, classId, step, module }: StepEditorProps) {
 	const queryClient = useQueryClient();
+	const navigate = useNavigate();
+
+	// Settled either way: a refetch shows the real order, and an ids_mismatch (someone else
+	// changed the module) is not retried.
+	const move = useMutation({
+		mutationFn: async (orderedIds: StepId[]) =>
+			orThrow(await reorderStepsFn({ data: { moduleId: module.id, orderedIds } })),
+		onSettled: () => queryClient.invalidateQueries({ queryKey: ["modules"] }),
+	});
+
+	// The syllabus refetches before leaving, so the class index can't resume at the deleted step.
+	const remove = useMutation({
+		mutationFn: async () => orThrow(await deleteStepFn({ data: { stepId: step.id } })),
+		onSuccess: async () => {
+			await queryClient.invalidateQueries({ queryKey: ["modules"] });
+			await navigate({ to: "/kelas/$classId", params: { classId }, ignoreBlocker: true });
+			queryClient.removeQueries({ queryKey: ["step", userId, step.id] });
+		},
+	});
+
 	return (
 		<StepForm
 			kind={step.kind}
 			initial={{ title: step.title, content: step.content }}
-			dueAt={dueAt}
+			dueAt={module.dueAt}
 			// The kind never changes, so the step's own kind goes with every save.
 			onSave={async (draft) => {
 				orThrow(
@@ -156,6 +194,24 @@ export function StepEditor({ userId, step, dueAt }: StepEditorProps) {
 					queryClient.invalidateQueries({ queryKey: ["step", userId, step.id] }),
 				]);
 			}}
+			actionFailed={move.isError || remove.isError}
+			actions={
+				<>
+					<MoveButtons
+						ids={module.steps.map((s) => s.id)}
+						id={step.id}
+						what="langkah"
+						pending={move.isPending}
+						onMove={(ids) => move.mutate(ids)}
+					/>
+					<DeleteButton
+						what="langkah"
+						consequence="Catatan baca siswa di langkah ini ikut terhapus."
+						pending={remove.isPending}
+						onConfirm={() => remove.mutate()}
+					/>
+				</>
+			}
 		/>
 	);
 }
