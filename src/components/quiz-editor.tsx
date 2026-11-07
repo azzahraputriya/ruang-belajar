@@ -91,8 +91,10 @@ type Selected = QuestionId | "new";
 
 // Same caps as the server's question-kinds.ts.
 const MAX_CHOICES = 10;
-// Random, never reused: stored answers name choices by id, so a new choice must not take a deleted one's id.
-// getRandomValues, not randomUUID, because it also works on a plain-http origin.
+// Random, never reused: stored answers name choices by id, so a choice added later must not take a deleted
+// one's id. A blank question starts at "a" and "b" instead, since nothing refers to it yet, and fixed ids
+// keep the server render and the browser's first render the same. getRandomValues, not randomUUID,
+// because it also works on a plain-http origin.
 const newChoiceId = () =>
 	Array.from(crypto.getRandomValues(new Uint32Array(2)), (n) => n.toString(36)).join("");
 
@@ -100,8 +102,8 @@ const blankDraft = (): QuestionDraft => ({
 	kind: "single_choice",
 	prompt: "",
 	choices: [
-		{ id: newChoiceId(), text: "" },
-		{ id: newChoiceId(), text: "" },
+		{ id: "a", text: "" },
+		{ id: "b", text: "" },
 	],
 	correct: [],
 	value: "",
@@ -376,7 +378,7 @@ type QuizEditorProps = {
 	// The step's own save, move, and delete, wired by StepEditor. onSave throws when the server says no.
 	onSave: (draft: StepDraft) => Promise<void>;
 	actions: React.ReactNode;
-	actionFailed: boolean;
+	actionError: Error | null;
 };
 
 // Render with key={stepId}. The step (title and settings) and the open question save separately,
@@ -507,8 +509,8 @@ export function QuizEditor(props: QuizEditorProps) {
 					<EditorBar
 						dirty={stepDirty}
 						save={saveStep}
-						saveFailed={saveStep.isError}
-						actionFailed={props.actionFailed}
+						saveError={saveStep.error}
+						actionError={props.actionError}
 						actions={props.actions}
 						left={
 							<TabsList>

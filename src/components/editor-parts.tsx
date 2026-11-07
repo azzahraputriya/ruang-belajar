@@ -15,6 +15,17 @@ import {
 	AlertDialogTrigger,
 } from "#/components/ui/alert-dialog";
 import { Button } from "#/components/ui/button";
+import { refusalMessage } from "#/lib/refused";
+import type {
+	createModuleFn,
+	createStepFn,
+	deleteModuleFn,
+	deleteStepFn,
+	reorderModulesFn,
+	reorderStepsFn,
+	updateModuleFn,
+	updateStepFn,
+} from "#/server/module-fns";
 
 type SaveState = { isPending: boolean; isSuccess: boolean; reset: () => void };
 
@@ -22,30 +33,52 @@ type EditorBarProps = {
 	left: React.ReactNode;
 	dirty: boolean;
 	save: SaveState;
-	saveFailed: boolean;
+	saveError: Error | null;
 	// A move or delete from the same pane failed.
-	actionFailed: boolean;
+	actionError: Error | null;
 	actions?: React.ReactNode;
+};
+
+type EditRefusal = Extract<
+	Awaited<
+		ReturnType<
+			| typeof createModuleFn
+			| typeof updateModuleFn
+			| typeof deleteModuleFn
+			| typeof reorderModulesFn
+			| typeof createStepFn
+			| typeof updateStepFn
+			| typeof deleteStepFn
+			| typeof reorderStepsFn
+		>
+	>,
+	{ ok: false }
+>["reason"];
+// Every reason a module or step change can be refused with. A new reason fails to compile until it has a message.
+const REFUSED: Record<EditRefusal, string> = {
+	not_found: "Sudah tidak ada. Muat ulang halaman.",
+	forbidden: "Hanya guru yang bisa mengubah ini.",
+	ids_mismatch: "Urutannya berubah di tempat lain. Muat ulang halaman.",
+	kind_changed: "Jenis langkah tidak bisa diubah.",
 };
 
 // Sits inside the editor's <form>, so Simpan submits it.
 // A failed save is worth retrying. A failed move or delete usually means the list changed
 // elsewhere, so it asks for a reload instead.
-function errorLine(saveFailed: boolean, actionFailed: boolean) {
-	if (saveFailed) return "Tidak bisa menyimpan. Coba lagi.";
-	if (actionFailed) return "Tidak berhasil. Muat ulang halaman, lalu coba lagi.";
+function errorLine(saveError: Error | null, actionError: Error | null) {
+	if (saveError) return refusalMessage(saveError, REFUSED, "Tidak bisa menyimpan. Coba lagi.");
+	if (actionError) {
+		return refusalMessage(
+			actionError,
+			REFUSED,
+			"Tidak berhasil. Muat ulang halaman, lalu coba lagi.",
+		);
+	}
 	return undefined;
 }
 
-export function EditorBar({
-	left,
-	dirty,
-	save,
-	saveFailed,
-	actionFailed,
-	actions,
-}: EditorBarProps) {
-	const error = errorLine(saveFailed, actionFailed);
+export function EditorBar({ left, dirty, save, saveError, actionError, actions }: EditorBarProps) {
+	const error = errorLine(saveError, actionError);
 	const { isSuccess, reset } = save;
 	// "Tersimpan" shows briefly, then the bar goes quiet again.
 	useEffect(() => {

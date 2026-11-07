@@ -48,7 +48,7 @@ type StepFormProps<K extends StepKind> = {
 	// Throws when the server says no.
 	onSave: (draft: Draft<K>) => Promise<void>;
 	actions?: React.ReactNode;
-	actionFailed?: boolean;
+	actionError?: Error | null;
 };
 
 export function StepForm<K extends StepKind>(props: StepFormProps<K>) {
@@ -98,8 +98,8 @@ export function StepForm<K extends StepKind>(props: StepFormProps<K>) {
 					<EditorBar
 						dirty={dirty}
 						save={save}
-						saveFailed={save.isError}
-						actionFailed={Boolean(props.actionFailed)}
+						saveError={save.error}
+						actionError={props.actionError ?? null}
 						actions={props.actions}
 						left={
 							<TabsList>
@@ -202,7 +202,7 @@ export function StepEditor({ userId, classId, step, module }: StepEditorProps) {
 			/>
 		</>
 	);
-	const actionFailed = move.isError || remove.isError;
+	const actionError = move.error ?? remove.error;
 
 	// A quiz's questions are rows with their own editor, so it gets a different pane.
 	if (step.kind === "quiz") {
@@ -214,7 +214,7 @@ export function StepEditor({ userId, classId, step, module }: StepEditorProps) {
 				dueAt={module.dueAt}
 				onSave={onSave}
 				actions={actions}
-				actionFailed={actionFailed}
+				actionError={actionError}
 			/>
 		);
 	}
@@ -224,7 +224,7 @@ export function StepEditor({ userId, classId, step, module }: StepEditorProps) {
 			initial={{ title: step.title, content: step.content }}
 			dueAt={module.dueAt}
 			onSave={onSave}
-			actionFailed={actionFailed}
+			actionError={actionError}
 			actions={actions}
 		/>
 	);
