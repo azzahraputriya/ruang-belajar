@@ -115,6 +115,7 @@ Settled by Afief, with the reason where it isn't obvious:
 - **Class switcher.** Mock B, a Slack-style rail of class tiles (Afief, 07 November 2026).
 - **No backups for now.** Accepted risk: if the VPS disk or the Postgres volume is lost, all accounts and class data are lost.
 - **Consent.** The tutor sends student work to an outside AI service, which counts as personal data under UU PDP (Law No. 27/2022). Afief approves the consent text and its stated purpose.
+- **Members screen.** Mock B, a side panel opened from "Anggota" in the class header (Afief, 07 November 2026).
 
 ## Open decisions
 
