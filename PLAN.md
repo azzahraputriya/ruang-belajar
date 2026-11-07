@@ -117,13 +117,13 @@ Settled by Afief, with the reason where it isn't obvious:
 - **No backups for now.** Accepted risk: if the VPS disk or the Postgres volume is lost, all accounts and class data are lost.
 - **Consent.** The tutor sends student work to an outside AI service, which counts as personal data under UU PDP (Law No. 27/2022). Afief approves the consent text and its stated purpose.
 - **Members screen.** Mock B, a side panel opened from "Anggota" in the class header (Afief, 07 November 2026).
+- **Quiz screens.** Mock B, one question at a time with numbered buttons, a result list with each answer, and a question list beside one editor for teachers (Afief, 07 November 2026).
 
 ## Open decisions
 
 Add any new question here with the phase it blocks.
 
 - **Phase 2 checks.** Afief confirms that a test account survives a container rebuild, and that SSH to `remote-dev.afiefabd.com` still works through the tunnel. Blocks nothing.
-- **Phase 5 screens.** Afief picks a quiz mock from `mocks/quiz/` (A, B, C, or a mix). Blocks Phase 5, and bringing Phases 5 to 7 up to date.
 
 ## Constraints
 
