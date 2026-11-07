@@ -6,17 +6,17 @@ This file is the roadmap. To pick up work, take the first phase that is `in prog
 
 ## Status
 
-| Phase                           | Status      | PRs                         |
-| ------------------------------- | ----------- | --------------------------- |
-| 0. Repo setup                   | in review   | #1, #2, #3 (merge in order) |
-| 1. Accounts                     | not started |                             |
-| 2. Deploy                       | not started |                             |
-| 3. Classes and invites          | not started |                             |
-| 4. Content: modules and steps   | not started |                             |
-| 5. Quizzes                      | not started |                             |
-| 6. Assignments and grading      | not started |                             |
-| 7. Discussion and announcements | not started |                             |
-| 8. AI tutor                     | not started |                             |
+| Phase                           | Status      | PRs                  |
+| ------------------------------- | ----------- | -------------------- |
+| 0. Repo setup                   | in review   | #1 to #5, release #6 |
+| 1. Accounts                     | not started |                      |
+| 2. Deploy                       | not started |                      |
+| 3. Classes and invites          | not started |                      |
+| 4. Content: modules and steps   | not started |                      |
+| 5. Quizzes                      | not started |                      |
+| 6. Assignments and grading      | not started |                      |
+| 7. Discussion and announcements | not started |                      |
+| 8. AI tutor                     | not started |                      |
 
 Phases 1 to 8 each end in a working, tested slice. Phase 2 can run alongside phase 3.
 
@@ -24,7 +24,9 @@ Phases 1 to 8 each end in a working, tested slice. Phase 2 can run alongside pha
 
 ### 0. Repo setup
 
-TanStack Start app, lint and format hooks, CI, branch protection, agent rules (`AGENTS.md`), PR template. After #3 merges, make `pr-format` a required check on the `main` ruleset.
+TanStack Start app, lint and format hooks, CI, branch protection, agent rules (`AGENTS.md`), PR template, and `pr-format` as a required check. Then shadcn/ui with the blue theme, and a `verify` skill that checks changes in a real browser.
+
+Each phase ships as a `release/phase-<n>` branch with one PR into `main`. Feature branches open PRs into the release branch. CI runs on both.
 
 ### 1. Accounts
 
