@@ -9,20 +9,19 @@ import { Markdown } from "#/components/step-kinds-ui";
 import { MARKDOWN_MAX } from "#/lib/markdown-field";
 import {
 	FileList,
+	GradeResult,
 	ReturnNote,
 	RubricLine,
 	SubmittedLine,
-	rubricTotal,
 } from "#/components/submission-parts";
 import { Button } from "#/components/ui/button";
 import { Textarea } from "#/components/ui/textarea";
 import type { ClassId, StepId } from "#/db/ids";
 import { type RefusalOf, Refused, refusalMessage } from "#/lib/refused";
 import { FILE_LIMITS, UPLOAD_ACCEPT, UPLOAD_EXTENSIONS } from "#/lib/upload-limits";
-import { formatDayTime, formatSaved } from "#/lib/wib";
+import { formatSaved } from "#/lib/wib";
 import { orThrow } from "#/server/module-fns";
 import type { Step } from "#/server/modules";
-import type { Rubric } from "#/server/step-kinds";
 import type { uploadFile } from "#/server/submission-files";
 import { deleteFileFn, mySubmissionQuery, saveDraftFn, submitFn } from "#/server/submission-fns";
 import type { SubmissionView } from "#/server/submissions";
@@ -190,7 +189,9 @@ export function SubmissionSheet({ userId, classId, step, dueAt, nextStepId }: Sh
 			<Markdown>{step.content.prompt}</Markdown>
 			<RubricLine rubric={rubric} />
 
-			{status === "graded" && sub ? <Result submission={sub} rubric={rubric} /> : null}
+			{status === "graded" && sub ? (
+				<GradeResult submission={sub} rubric={rubric} className="mt-8 border-t pt-6" />
+			) : null}
 
 			<section aria-labelledby="jawaban" className="mt-8 grid gap-3 border-t pt-6">
 				<div className="flex flex-wrap items-baseline gap-x-2 text-sm">
@@ -288,53 +289,5 @@ export function SubmissionSheet({ userId, classId, step, dueAt, nextStepId }: Sh
 				) : null}
 			</div>
 		</>
-	);
-}
-
-// The grade, with the same type scale as the quiz result, so a score reads the same everywhere.
-// Points are read by criterion id, so a criterion the teacher removed after grading just drops out.
-function Result({
-	submission,
-	rubric,
-}: {
-	submission: SubmissionView;
-	rubric: Rubric | undefined;
-}) {
-	return (
-		<section aria-label="Nilai" className="mt-8 border-t pt-6">
-			<p className="text-xs text-muted-foreground">
-				Nilai{submission.gradedAt ? ` · ${formatDayTime(submission.gradedAt)}` : null}
-			</p>
-			<p className="mt-1">
-				<span className="text-5xl font-semibold tracking-tight tabular-nums">
-					{submission.score}
-				</span>
-				<span className="text-muted-foreground"> / {rubric ? rubricTotal(rubric) : 100}</span>
-			</p>
-			{rubric ? (
-				<ol className="mt-5 border-t">
-					{rubric.map((c) => (
-						<li key={c.id} className="flex items-start gap-3 border-b py-2.5">
-							<div className="grid min-w-0 flex-1 gap-0.5">
-								<p className="text-sm">{c.title}</p>
-								{c.description ? (
-									<p className="text-xs text-muted-foreground">{c.description}</p>
-								) : null}
-							</div>
-							<p className="shrink-0 text-sm tabular-nums">
-								<span className="font-medium">{submission.rubricScores?.[c.id] ?? "–"}</span>
-								<span className="text-muted-foreground"> / {c.maxPoints}</span>
-							</p>
-						</li>
-					))}
-				</ol>
-			) : null}
-			{submission.comment ? (
-				<>
-					<p className="mt-4 text-xs text-muted-foreground">Komentar guru</p>
-					<p className="mt-1 text-sm whitespace-pre-wrap">{submission.comment}</p>
-				</>
-			) : null}
-		</section>
 	);
 }
