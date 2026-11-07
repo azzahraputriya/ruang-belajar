@@ -5,7 +5,7 @@ import { sessionQuery } from "#/server/session-fn";
 
 export const Route = createFileRoute("/_app")({
 	beforeLoad: async ({ context }) => {
-		const user = await context.queryClient.ensureQueryData(sessionQuery);
+		const user = await context.queryClient.fetchQuery(sessionQuery);
 		if (!user) throw redirect({ to: "/masuk" });
 		return { user };
 	},

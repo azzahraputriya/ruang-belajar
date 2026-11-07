@@ -5,7 +5,7 @@ import { sessionQuery } from "#/server/session-fn";
 
 export const Route = createFileRoute("/_auth")({
 	beforeLoad: async ({ context }) => {
-		if (await context.queryClient.ensureQueryData(sessionQuery)) throw redirect({ to: "/" });
+		if (await context.queryClient.fetchQuery(sessionQuery)) throw redirect({ to: "/" });
 	},
 	component: AuthLayout,
 });

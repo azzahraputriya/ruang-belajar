@@ -1,14 +1,13 @@
 // Owns: the sign-up page at /daftar. Not here: the split-screen layout (src/routes/_auth.tsx), the sign-up rules and their messages (src/lib/sign-up-rules.ts), or the server side (src/server/sign-up-fn.ts).
 
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { type } from "arktype";
 import { useState } from "react";
 import { flushSync } from "react-dom";
 import { FormField } from "#/components/form-field";
 import { FormSubmit } from "#/components/form-submit";
-import { type SignUpField, type SignUpInput, signUpErrors } from "#/lib/sign-up-rules";
-import { resetSession } from "#/server/session-fn";
+import { PASSWORD, type SignUpField, type SignUpInput, signUpErrors } from "#/lib/sign-up-rules";
 import { signUpFn } from "#/server/sign-up-fn";
 
 export const Route = createFileRoute("/_auth/daftar")({
@@ -21,7 +20,6 @@ type FieldErrors = Partial<Record<SignUpField, string>>;
 
 function SignUp() {
 	const navigate = useNavigate();
-	const queryClient = useQueryClient();
 	const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
 	const [formError, setFormError] = useState("");
 
@@ -42,7 +40,6 @@ function SignUp() {
 				showErrors({ username: "Nama pengguna ini sudah dipakai. Pilih yang lain." });
 				return;
 			}
-			resetSession(queryClient);
 			await navigate({ to: "/" });
 		},
 		onError: () => showErrors({}, "Tidak bisa mendaftar sekarang. Coba lagi."),
@@ -60,7 +57,8 @@ function SignUp() {
 	return (
 		<>
 			<h1 className="text-xl font-semibold tracking-tight">Buat akun</h1>
-			<form className="grid gap-4" noValidate onSubmit={onSubmit}>
+			{/* POST, so a tap before the page script loads never puts the password in the URL. */}
+			<form method="post" className="grid gap-4" noValidate onSubmit={onSubmit}>
 				<FormField
 					id="username"
 					label="Nama pengguna"
@@ -81,7 +79,7 @@ function SignUp() {
 				<FormField
 					id="password"
 					label="Kata sandi"
-					hint="Minimal 8 karakter."
+					hint={`Minimal ${PASSWORD.min} karakter.`}
 					type="password"
 					autoComplete="new-password"
 					error={fieldErrors.password}

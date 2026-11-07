@@ -1,6 +1,6 @@
 // Owns: the sign-in page at /masuk. Not here: the split-screen layout (src/routes/_auth.tsx) or sign-in itself (better-auth, via src/lib/auth-client.ts).
 
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { type } from "arktype";
 import { useState } from "react";
@@ -8,7 +8,6 @@ import { flushSync } from "react-dom";
 import { FormField } from "#/components/form-field";
 import { FormSubmit } from "#/components/form-submit";
 import { authClient } from "#/lib/auth-client";
-import { resetSession } from "#/server/session-fn";
 
 export const Route = createFileRoute("/_auth/masuk")({
 	head: () => ({ meta: [{ title: "Masuk · Ruang Belajar" }] }),
@@ -33,7 +32,6 @@ function signInFailure(status: number) {
 
 function SignIn() {
 	const navigate = useNavigate();
-	const queryClient = useQueryClient();
 	const [fieldErrors, setFieldErrors] = useState<Partial<Record<Field, string>>>({});
 	const [formError, setFormError] = useState("");
 
@@ -47,7 +45,6 @@ function SignIn() {
 				setFormError(failure);
 				return;
 			}
-			resetSession(queryClient);
 			await navigate({ to: "/" });
 		},
 		onError: () => setFormError("Tidak bisa masuk sekarang. Periksa koneksi, lalu coba lagi."),
@@ -75,7 +72,8 @@ function SignIn() {
 	return (
 		<>
 			<h1 className="text-xl font-semibold tracking-tight">Masuk</h1>
-			<form className="grid gap-4" noValidate onSubmit={onSubmit}>
+			{/* POST, so a tap before the page script loads never puts the password in the URL. */}
+			<form method="post" className="grid gap-4" noValidate onSubmit={onSubmit}>
 				<FormField
 					id="username"
 					label="Nama pengguna"
