@@ -230,7 +230,8 @@ describe("invites", () => {
 		);
 		for (const { accepted, again, members } of runs) {
 			expect(accepted.ok).toBe(true);
-			expect(again.ok || again.reason === "already_member").toBe(true);
+			// Either order is fine: before the accept commits the old invite is still pending, after it the student is a member.
+			expect(again.ok || ["already_invited", "already_member"].includes(again.reason)).toBe(true);
 			expect(members).toBe(2);
 		}
 	});
