@@ -5,6 +5,7 @@ import { isNotFound, notFound } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
 import { type } from "arktype";
 import { ClassId, ModuleId, StepId } from "#/db/ids";
+import { Refused } from "#/lib/refused";
 import { requireActor } from "#/server/class-fns";
 import {
 	ModuleInput,
@@ -83,7 +84,8 @@ export const classProgressFn = createServerFn()
 	.validator(InClass)
 	.handler(async ({ data }) => classProgress(await requireActor(), data.classId));
 
-// Mutations throw on a failed result, so `isError` shows the form's error line.
+// Mutations throw on a failed result, so `isError` shows the form's error line. The thrown Refused keeps
+// the reason, so a screen can pick a message for it (src/lib/refused.ts).
 type Result = { ok: true } | { ok: false; reason: string };
 const isOk = <R extends Result>(result: R): result is Extract<R, { ok: true }> => result.ok;
 
@@ -91,13 +93,13 @@ const reasonOf = (result: Result) => (result.ok ? "ok" : result.reason);
 
 export function orThrow<R extends Result>(result: R) {
 	if (isOk(result)) return result;
-	throw new Error(`Server said: ${reasonOf(result)}`);
+	throw new Refused(reasonOf(result));
 }
 
 // A failed read is the router's "not found", so a loader shows the pane's not-found screen.
 // Keyed by user like the class queries. Invalidate with the bare prefix after writes.
 // "Not found" won't change on a retry, so only other errors (a dropped connection) are retried.
-const retry = (failures: number, error: unknown) => !isNotFound(error) && failures < 3;
+export const retry = (failures: number, error: unknown) => !isNotFound(error) && failures < 3;
 
 export const modulesQuery = (userId: string, classId: ClassId) =>
 	queryOptions({

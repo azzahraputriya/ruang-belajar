@@ -1,4 +1,4 @@
-// Owns: the teacher's step editor (Tulis and Pratinjau, title and kind fields, client checks) and the wiring that creates, updates, moves, or deletes a step through it. Not here: each kind's fields and view (src/components/step-kinds-ui.tsx) or the student's reader (src/components/step-reader.tsx).
+// Owns: the teacher's step editor (Tulis and Pratinjau, title and kind fields, client checks) and the wiring that creates, updates, moves, or deletes a step through it, for quizzes too. Not here: each kind's fields and view (src/components/step-kinds-ui.tsx), a saved quiz's questions editor (src/components/quiz-editor.tsx), or the student's reader (src/components/step-reader.tsx).
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
@@ -11,12 +11,14 @@ import {
 	UnsavedChangesGuard,
 } from "#/components/editor-parts";
 import { FormField } from "#/components/form-field";
+import { QuizEditor } from "#/components/quiz-editor";
 import { StepArticle } from "#/components/step-reader";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "#/components/ui/tabs";
 import {
 	type ContentOf,
 	type FieldErrors,
 	StepFields,
+	StepView,
 	checkStepContent,
 	STEP_KIND_UI,
 } from "#/components/step-kinds-ui";
@@ -108,12 +110,9 @@ export function StepForm<K extends StepKind>(props: StepFormProps<K>) {
 					/>
 				</div>
 				<TabsContent value="pratinjau">
-					<StepArticle
-						kind={kind}
-						title={draft.title.trim() || "Tanpa judul"}
-						content={draft.content}
-						dueAt={dueAt}
-					/>
+					<StepArticle kind={kind} title={draft.title.trim() || "Tanpa judul"} dueAt={dueAt}>
+						<StepView kind={kind} content={draft.content} title={draft.title} />
+					</StepArticle>
 				</TabsContent>
 				<TabsContent
 					value="tulis"
@@ -171,42 +170,62 @@ export function StepEditor({ userId, classId, step, module }: StepEditorProps) {
 		},
 	});
 
+	// The kind never changes, so the step's own kind goes with every save.
+	async function onSave(draft: { title: string; content: unknown }) {
+		// A new save replaces any earlier move or delete error in the bar.
+		move.reset();
+		remove.reset();
+		orThrow(await updateStepFn({ data: { stepId: step.id, step: { kind: step.kind, ...draft } } }));
+		await Promise.all([
+			queryClient.invalidateQueries({ queryKey: ["modules"] }),
+			queryClient.invalidateQueries({ queryKey: ["step", userId, step.id] }),
+		]);
+	}
+	const actions = (
+		<>
+			<MoveButtons
+				ids={module.steps.map((s) => s.id)}
+				id={step.id}
+				what="langkah"
+				pending={move.isPending}
+				onMove={(ids) => move.mutate(ids)}
+			/>
+			<DeleteButton
+				what="langkah"
+				consequence={
+					step.kind === "quiz"
+						? "Soal dan nilai siswa di kuis ini ikut terhapus."
+						: "Catatan baca siswa di langkah ini ikut terhapus."
+				}
+				pending={remove.isPending}
+				onConfirm={() => remove.mutate()}
+			/>
+		</>
+	);
+	const actionFailed = move.isError || remove.isError;
+
+	// A quiz's questions are rows with their own editor, so it gets a different pane.
+	if (step.kind === "quiz") {
+		return (
+			<QuizEditor
+				userId={userId}
+				stepId={step.id}
+				initial={{ title: step.title, content: step.content }}
+				dueAt={module.dueAt}
+				onSave={onSave}
+				actions={actions}
+				actionFailed={actionFailed}
+			/>
+		);
+	}
 	return (
 		<StepForm
 			kind={step.kind}
 			initial={{ title: step.title, content: step.content }}
 			dueAt={module.dueAt}
-			// The kind never changes, so the step's own kind goes with every save.
-			onSave={async (draft) => {
-				// A new save replaces any earlier move or delete error in the bar.
-				move.reset();
-				remove.reset();
-				orThrow(
-					await updateStepFn({ data: { stepId: step.id, step: { kind: step.kind, ...draft } } }),
-				);
-				await Promise.all([
-					queryClient.invalidateQueries({ queryKey: ["modules"] }),
-					queryClient.invalidateQueries({ queryKey: ["step", userId, step.id] }),
-				]);
-			}}
-			actionFailed={move.isError || remove.isError}
-			actions={
-				<>
-					<MoveButtons
-						ids={module.steps.map((s) => s.id)}
-						id={step.id}
-						what="langkah"
-						pending={move.isPending}
-						onMove={(ids) => move.mutate(ids)}
-					/>
-					<DeleteButton
-						what="langkah"
-						consequence="Catatan baca siswa di langkah ini ikut terhapus."
-						pending={remove.isPending}
-						onConfirm={() => remove.mutate()}
-					/>
-				</>
-			}
+			onSave={onSave}
+			actionFailed={actionFailed}
+			actions={actions}
 		/>
 	);
 }

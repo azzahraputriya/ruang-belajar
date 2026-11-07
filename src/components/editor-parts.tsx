@@ -1,4 +1,4 @@
-// Owns: the pieces the step and module editors share: the top bar with save state, Simpan, and the error line, the move buttons, the delete confirm, and the unsaved-changes guard. Not here: the editors' fields and saving (src/components/step-form.tsx, src/components/module-form.tsx).
+// Owns: the pieces the step and module editors share: the top bar with save state, Simpan, and the error line, the move buttons, the delete confirm, and the unsaved-changes guard and dialog. Not here: the editors' fields and saving (src/components/step-form.tsx, src/components/module-form.tsx).
 
 import { useBlocker } from "@tanstack/react-router";
 import { ArrowDown, ArrowUp, Trash2 } from "lucide-react";
@@ -165,21 +165,22 @@ export function DeleteButton({
 
 const always = () => true;
 
-// While the form has unsaved edits, leaving the page asks first: links and Back get this dialog,
-// closing or reloading the tab gets the browser's own prompt. Navigations that follow a save pass
-// `ignoreBlocker`.
-export function UnsavedChangesGuard({ dirty }: { dirty: boolean }) {
-	const blocker = useBlocker({
-		shouldBlockFn: always,
-		disabled: !dirty,
-		enableBeforeUnload: true,
-		withResolver: true,
-	});
+// "Leave without saving?" Shared by the route guard below and by editors that switch what they show
+// in place, like the quiz editor's question list.
+export function DiscardDialog({
+	open,
+	onStay,
+	onLeave,
+}: {
+	open: boolean;
+	onStay: () => void;
+	onLeave: () => void;
+}) {
 	return (
 		<AlertDialog
-			open={blocker.status === "blocked"}
-			onOpenChange={(open) => {
-				if (!open) blocker.reset?.();
+			open={open}
+			onOpenChange={(next) => {
+				if (!next) onStay();
 			}}
 		>
 			<AlertDialogContent>
@@ -191,11 +192,30 @@ export function UnsavedChangesGuard({ dirty }: { dirty: boolean }) {
 				</AlertDialogHeader>
 				<AlertDialogFooter>
 					<AlertDialogCancel>Tetap di sini</AlertDialogCancel>
-					<AlertDialogAction variant="destructive" onClick={() => blocker.proceed?.()}>
+					<AlertDialogAction variant="destructive" onClick={onLeave}>
 						Tinggalkan
 					</AlertDialogAction>
 				</AlertDialogFooter>
 			</AlertDialogContent>
 		</AlertDialog>
+	);
+}
+
+// While the form has unsaved edits, leaving the page asks first: links and Back get this dialog,
+// closing or reloading the tab gets the browser's own prompt. Navigations that follow a save pass
+// `ignoreBlocker`.
+export function UnsavedChangesGuard({ dirty }: { dirty: boolean }) {
+	const blocker = useBlocker({
+		shouldBlockFn: always,
+		disabled: !dirty,
+		enableBeforeUnload: true,
+		withResolver: true,
+	});
+	return (
+		<DiscardDialog
+			open={blocker.status === "blocked"}
+			onStay={() => blocker.reset?.()}
+			onLeave={() => blocker.proceed?.()}
+		/>
 	);
 }

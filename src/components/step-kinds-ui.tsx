@@ -1,8 +1,9 @@
 // Owns: how each step kind looks on screen, meaning its label, icon, student view, editor fields, empty content, and client checks, plus the markdown renderer they share. Not here: each kind's stored shape and status rule (src/server/step-kinds.ts).
 
-import { BookOpen, ExternalLink, PlayCircle, type LucideIcon } from "lucide-react";
+import { BookOpen, ExternalLink, ListChecks, PlayCircle, type LucideIcon } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { TextareaField, FormField } from "#/components/form-field";
+import { Input } from "#/components/ui/input";
 import type { StepKind } from "#/db/content-schema";
 import { embedSrc } from "#/lib/embed-src";
 import type { STEP_KINDS } from "#/server/step-kinds";
@@ -34,9 +35,10 @@ const MONO = "min-h-80 font-mono text-[13px] leading-6";
 
 // react-markdown's defaults drop raw HTML and unsafe link schemes such as javascript:.
 // Keep them: no rehype-raw, no custom urlTransform, no skipHtml override.
-export function Markdown({ children }: { children: string }) {
+// `className` resizes it: utilities win over the .markdown component class.
+export function Markdown({ children, className }: { children: string; className?: string }) {
 	return (
-		<div className="markdown">
+		<div className={className ? `markdown ${className}` : "markdown"}>
 			<ReactMarkdown>{children}</ReactMarkdown>
 		</div>
 	);
@@ -48,6 +50,83 @@ function isHttps(raw: string) {
 	} catch {
 		return false;
 	}
+}
+
+type QuizSettings = ContentOf<"quiz">;
+const SETTINGS_LIMITS = { maxAttempts: [1, 10], passScore: [0, 100] } as const;
+
+// An empty number input holds NaN, which the check below refuses.
+const numberValue = (n: number) => (Number.isNaN(n) ? "" : n);
+
+// The quiz's two settings. Inline sits in the quiz editor's top row; the new-step form stacks them.
+export function QuizSettingsFields({
+	value,
+	onChange,
+	errors,
+	inline = false,
+}: {
+	value: QuizSettings;
+	onChange: (next: QuizSettings) => void;
+	errors: FieldErrors;
+	inline?: boolean;
+}) {
+	const fields = [
+		{ id: "maxAttempts", label: "Maks. percobaan" },
+		{ id: "passScore", label: "Nilai lulus" },
+	] as const;
+	if (inline) {
+		return (
+			<div className="flex flex-wrap items-center gap-3">
+				{fields.map(({ id, label }) => (
+					<label key={id} className="flex items-center gap-1.5">
+						<span className="text-xs text-muted-foreground">{label}</span>
+						<Input
+							id={id}
+							name={id}
+							type="number"
+							inputMode="numeric"
+							min={SETTINGS_LIMITS[id][0]}
+							max={SETTINGS_LIMITS[id][1]}
+							aria-invalid={errors[id] ? true : undefined}
+							value={numberValue(value[id])}
+							onChange={(e) => onChange({ ...value, [id]: e.target.valueAsNumber })}
+							className="h-7 w-16 tabular-nums"
+						/>
+					</label>
+				))}
+			</div>
+		);
+	}
+	return (
+		<div className="grid grid-cols-[repeat(2,minmax(0,10rem))] gap-5">
+			{fields.map(({ id, label }) => (
+				<FormField
+					key={id}
+					id={id}
+					label={label}
+					type="number"
+					inputMode="numeric"
+					min={SETTINGS_LIMITS[id][0]}
+					max={SETTINGS_LIMITS[id][1]}
+					error={errors[id]}
+					value={numberValue(value[id])}
+					onChange={(e) => onChange({ ...value, [id]: e.target.valueAsNumber })}
+					className="tabular-nums"
+				/>
+			))}
+		</div>
+	);
+}
+
+// Same ranges as the server's QuizContent.
+function checkQuizSettings(settings: QuizSettings): FieldErrors {
+	const errors: FieldErrors = {};
+	for (const id of ["maxAttempts", "passScore"] as const) {
+		const [min, max] = SETTINGS_LIMITS[id];
+		const n = settings[id];
+		if (!Number.isInteger(n) || n < min || n > max) errors[id] = `Isi ${min} sampai ${max}.`;
+	}
+	return errors;
 }
 
 // A mapped type, not a Record, so a new kind in the enum fails to compile until it has an entry,
@@ -135,6 +214,23 @@ export const STEP_KIND_UI: { [K in StepKind]: KindUi<K> } = {
 			</>
 		),
 		check: ({ url }) => (isHttps(url) ? {} : { url: "Isi tautan yang diawali https://." }),
+	},
+	// A saved quiz has its own screens (src/components/quiz-taker.tsx, src/components/quiz-editor.tsx),
+	// because its questions are rows, not content. View and Fields here only serve the new-step form.
+	quiz: {
+		label: "Kuis",
+		Icon: ListChecks,
+		empty: { maxAttempts: 3, passScore: 70 },
+		View: ({ content }) => (
+			<p className="text-sm text-muted-foreground">
+				{content.maxAttempts} percobaan · nilai lulus {content.passScore}. Soal ditambah setelah
+				disimpan.
+			</p>
+		),
+		Fields: ({ value, onChange, errors }) => (
+			<QuizSettingsFields value={value} onChange={onChange} errors={errors} />
+		),
+		check: checkQuizSettings,
 	},
 };
 
