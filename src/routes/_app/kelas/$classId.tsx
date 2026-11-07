@@ -4,6 +4,7 @@ import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { type } from "arktype";
 import { useEffect } from "react";
 import { InviteBanner } from "#/components/invite-banner";
+import { MembersPanel } from "#/components/members-panel";
 import { ClassId } from "#/db/ids";
 import { ROLE_LABEL } from "#/lib/class-labels";
 import { getClassFn, listMembersFn, setLastClassFn } from "#/server/class-fns";
@@ -45,6 +46,7 @@ function ClassPage() {
 				<span className="shrink-0 text-sm text-muted-foreground">
 					{ROLE_LABEL[cls.myRole]} · {memberCount} anggota
 				</span>
+				<MembersPanel cls={cls} />
 			</header>
 			<InviteBanner />
 			<p className="px-4 py-6 text-sm text-muted-foreground sm:px-6">Belum ada modul.</p>
