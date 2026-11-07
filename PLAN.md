@@ -113,6 +113,7 @@ Settled by Afief, with the reason where it isn't obvious:
 - **Hosting.** The whole app runs on the VPS, not Vercel (Afief, 07 November 2026). Vercel would have to reach Postgres over the internet, which needs an open port, and the app's server code runs next to its pages.
 - **Sign-in and sign-up screens.** Mock B, a split screen with a blue panel (Afief, 07 November 2026).
 - **Class switcher.** Mock B, a Slack-style rail of class tiles (Afief, 07 November 2026).
+- **Modules and steps screens.** Mock B, a two-pane player with the syllabus beside the open step (Afief, 07 November 2026).
 - **No backups for now.** Accepted risk: if the VPS disk or the Postgres volume is lost, all accounts and class data are lost.
 - **Consent.** The tutor sends student work to an outside AI service, which counts as personal data under UU PDP (Law No. 27/2022). Afief approves the consent text and its stated purpose.
 
