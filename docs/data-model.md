@@ -72,7 +72,7 @@ A step is a tagged union. `kind` picks the shape of `content` and what the stude
 
 Each kind is one entry in `src/server/step-kinds.ts`: its content shape, whether the student marks it finished, and how its status is computed. Adding a kind is one value in the `step_kind` enum (a migration) plus one entry there.
 
-- `reading` content is a markdown `body`. Images are markdown image links until uploads arrive with assignments.
+- `reading` content is a markdown `body`. Images are markdown image links. Uploads belong to submissions only.
 - `embed` content is an https `url` and markdown `instructions`. Other schemes are refused.
 - A step's kind can't change after it is created.
 

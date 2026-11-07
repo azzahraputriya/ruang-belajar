@@ -1,5 +1,5 @@
 {
-	"id": "a1ac17ee-6ee1-4ecc-b113-5146cdaa63b6",
+	"id": "b0bff1bf-1460-47a7-8ad6-be17977a2458",
 	"prevId": "93a0a791-f8c5-4f79-8f4b-9bf54815ffa5",
 	"version": "7",
 	"dialect": "postgresql",
@@ -1258,10 +1258,20 @@
 			"columns": {
 				"id": {
 					"name": "id",
-					"type": "uuid",
+					"type": "integer",
 					"primaryKey": true,
 					"notNull": true,
-					"default": "gen_random_uuid()"
+					"identity": {
+						"type": "always",
+						"name": "submission_event_id_seq",
+						"schema": "public",
+						"increment": "1",
+						"startWith": "1",
+						"minValue": "1",
+						"maxValue": "2147483647",
+						"cache": "1",
+						"cycle": false
+					}
 				},
 				"submission_id": {
 					"name": "submission_id",

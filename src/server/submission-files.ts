@@ -205,20 +205,53 @@ const STATUS_FOR: Partial<Record<string, number>> = {
 	file_too_large: 413,
 };
 
+const MAX_BODY = FILE_LIMITS.maxBytes + FORM_OVERHEAD;
+const tooLarge = () => Response.json(fail("file_too_large"), { status: 413 });
+
+// The whole body, or undefined once it passes `limit`. Counting as it arrives caps memory even when
+// there is no Content-Length, as with a chunked body through a proxy.
+async function readUpTo(body: ReadableStream<Uint8Array> | null, limit: number) {
+	if (!body) return new Uint8Array();
+	const reader = body.getReader();
+	const chunks: Uint8Array[] = [];
+	let size = 0;
+	for (;;) {
+		// oxlint-disable-next-line no-await-in-loop -- A stream gives its chunks one at a time.
+		const { done, value } = await reader.read();
+		if (done) break;
+		size += value.length;
+		if (size > limit) break;
+		chunks.push(value);
+	}
+	if (size > limit) {
+		await reader.cancel();
+		return undefined;
+	}
+	const bytes = new Uint8Array(size);
+	let at = 0;
+	for (const chunk of chunks) {
+		bytes.set(chunk, at);
+		at += chunk.length;
+	}
+	return bytes;
+}
+
 // POST /api/files/upload/$stepId with a multipart form holding one `file`.
-// The length is checked before the body is read, so an oversized upload is never held in memory.
+// An oversized upload is refused by its Content-Length before reading, or as soon as it passes the
+// cap, so it is never held whole in memory.
 export async function handleUpload(request: Request, rawStepId: string) {
 	const actor = await actorOf(request);
 	const stepId = StepId(rawStepId);
 	if (!actor || stepId instanceof type.errors) return notFound();
-	const length = Number(request.headers.get("content-length"));
-	if (!Number.isInteger(length) || length <= 0) {
-		return Response.json(fail("length_required"), { status: 411 });
-	}
-	if (length > FILE_LIMITS.maxBytes + FORM_OVERHEAD) {
-		return Response.json(fail("file_too_large"), { status: 413 });
-	}
-	const form = await request.formData().catch(() => undefined);
+
+	if (Number(request.headers.get("content-length")) > MAX_BODY) return tooLarge();
+	const body = await readUpTo(request.body, MAX_BODY);
+	if (!body) return tooLarge();
+	const form = await new Response(body, {
+		headers: { "content-type": request.headers.get("content-type") ?? "" },
+	})
+		.formData()
+		.catch(() => undefined);
 	const file = form?.get("file");
 	if (!(file instanceof File)) return Response.json(fail("no_file"), { status: 400 });
 	const result = await uploadFile(actor, stepId, file);

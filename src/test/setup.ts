@@ -1,4 +1,4 @@
-// Owns: giving every test an empty database and an empty uploads folder, and closing the connection after each file. Not here: migrations (src/test/global-setup.ts).
+// Owns: giving every test an empty database and an empty uploads folder, and closing the connection and removing that folder after each file. Not here: migrations (src/test/global-setup.ts).
 
 import { rm } from "node:fs/promises";
 import { sql } from "drizzle-orm";
@@ -20,4 +20,5 @@ beforeEach(async () => {
 
 afterAll(async () => {
 	await db.$client.end();
+	await rm(env.UPLOAD_DIR, { recursive: true, force: true });
 });

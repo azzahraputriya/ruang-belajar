@@ -115,7 +115,7 @@ async function viewsOf(conn: Conn, rows: readonly Row[], dueAt: Date | null) {
 						})
 						.from(submissionEvent)
 						.where(inArray(submissionEvent.submissionId, ids))
-						.orderBy(asc(submissionEvent.at)),
+						.orderBy(asc(submissionEvent.id)),
 				]);
 	return rows.map((row) => ({
 		id: row.id,

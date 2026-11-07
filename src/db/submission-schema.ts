@@ -84,7 +84,8 @@ export const submissionFile = pgTable(
 export const submissionEvent = pgTable(
 	"submission_event",
 	{
-		id: uuid("id").primaryKey().defaultRandom(),
+		// A counter, not a uuid: it orders the history even when two moves share a millisecond.
+		id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
 		submissionId: uuid("submission_id")
 			.notNull()
 			.references(() => submission.id, { onDelete: "cascade" })

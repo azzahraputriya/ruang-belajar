@@ -86,6 +86,25 @@ async function uploadRequest(stepId: string, cookie: Headers | undefined, file: 
 	});
 }
 
+// The same upload sent as a stream in 64 KB chunks, with no Content-Length, as a proxy may send it.
+async function streamed(request: Request) {
+	const bytes = new Uint8Array(await request.arrayBuffer());
+	let at = 0;
+	const body = new ReadableStream<Uint8Array>({
+		pull(controller) {
+			if (at >= bytes.length) return controller.close();
+			controller.enqueue(bytes.slice(at, at + 64 * 1024));
+			at += 64 * 1024;
+		},
+	});
+	const headers = new Headers(request.headers);
+	headers.delete("content-length");
+	// Node needs `duplex` for a stream body. TypeScript's RequestInit doesn't list it yet, so it
+	// goes in through a variable, which skips the check for unknown keys.
+	const init = { method: "POST", headers, body, duplex: "half" };
+	return new Request(request.url, init);
+}
+
 const downloadRequest = (fileId: string, cookie?: Headers) =>
 	new Request(`http://localhost:3000/api/files/${fileId}`, { headers: cookie });
 
@@ -167,9 +186,6 @@ describe("uploading", () => {
 		const tooLong = await uploadRequest(stepId, cookie, pdf());
 		tooLong.headers.set("content-length", String(FILE_LIMITS.maxBytes * 2));
 		expect((await handleUpload(tooLong, stepId)).status).toBe(413);
-		const noLength = await uploadRequest(stepId, cookie, pdf());
-		noLength.headers.delete("content-length");
-		expect((await handleUpload(noLength, stepId)).status).toBe(411);
 
 		// One more than the limit, all at once: the count is taken under the class lock.
 		const results = await Promise.all(
@@ -180,6 +196,17 @@ describe("uploading", () => {
 		expect(results.filter((r) => r.ok)).toHaveLength(FILE_LIMITS.perSubmission);
 		expect(results.filter((r) => !r.ok)).toEqual([{ ok: false, reason: "too_many_files" }]);
 		expect(await filesOnDisk()).toHaveLength(FILE_LIMITS.perSubmission);
+	});
+
+	it("takes a chunked body with no Content-Length, up to the cap", async () => {
+		const { stepId } = await classWithAssignment();
+		const cookie = await cookieFor("siswa");
+		const small = await streamed(await uploadRequest(stepId, cookie, pdf()));
+		expect((await handleUpload(small, stepId)).status).toBe(201);
+		const big = pdf("besar.pdf", "x".repeat(FILE_LIMITS.maxBytes + 1));
+		const huge = await streamed(await uploadRequest(stepId, cookie, big));
+		expect((await handleUpload(huge, stepId)).status).toBe(413);
+		expect(await filesOnDisk()).toHaveLength(1);
 	});
 
 	it("refuses a disallowed type and leaves nothing on disk", async () => {

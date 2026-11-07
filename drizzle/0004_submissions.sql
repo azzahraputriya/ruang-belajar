@@ -19,7 +19,7 @@ CREATE TABLE "submission" (
 );
 --> statement-breakpoint
 CREATE TABLE "submission_event" (
-	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"id" integer PRIMARY KEY GENERATED ALWAYS AS IDENTITY (sequence name "submission_event_id_seq" INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 START WITH 1 CACHE 1),
 	"submission_id" uuid NOT NULL,
 	"action" "submission_action" NOT NULL,
 	"comment" text,
