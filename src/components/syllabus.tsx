@@ -83,9 +83,6 @@ function SyllabusTree(props: SyllabusProps) {
 	const [now] = useState(() => new Date());
 	return (
 		<>
-			{modules.length === 0 ? (
-				<p className="px-4 py-1.5 text-sm text-muted-foreground">Belum ada modul.</p>
-			) : null}
 			{modules.map((m, i) => {
 				const heading = (
 					<>

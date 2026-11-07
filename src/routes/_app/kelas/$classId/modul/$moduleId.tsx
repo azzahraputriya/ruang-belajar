@@ -2,6 +2,8 @@
 
 import { createFileRoute, notFound } from "@tanstack/react-router";
 import { type } from "arktype";
+import { useSuspenseQuery } from "@tanstack/react-query";
+import { ModuleEditor } from "#/components/module-form";
 import { PaneMessage } from "#/components/pane-message";
 import { ClassId, ModuleId } from "#/db/ids";
 import { modulesQuery } from "#/server/module-fns";
@@ -28,5 +30,12 @@ export const Route = createFileRoute("/_app/kelas/$classId/modul/$moduleId")({
 });
 
 function ModulePane() {
-	return null;
+	const { classId, moduleId } = Route.useLoaderData();
+	const { user } = Route.useRouteContext();
+	const { data: modules } = useSuspenseQuery(modulesQuery(user.id, classId));
+	const at = modules.findIndex((m) => m.id === moduleId);
+	const module = modules[at];
+	// Gone after a refetch, e.g. deleted in another tab.
+	if (!module) return <PaneMessage title="Modul tidak ditemukan." />;
+	return <ModuleEditor key={module.id} classId={classId} module={module} number={at + 1} />;
 }

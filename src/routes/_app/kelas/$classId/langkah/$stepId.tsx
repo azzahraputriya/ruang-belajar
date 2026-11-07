@@ -4,6 +4,7 @@ import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, getRouteApi, notFound } from "@tanstack/react-router";
 import { type } from "arktype";
 import { PaneMessage } from "#/components/pane-message";
+import { StepEditor } from "#/components/step-form";
 import { StepReader } from "#/components/step-reader";
 import { ClassId, StepId } from "#/db/ids";
 import { modulesQuery, progressQuery, stepQuery } from "#/server/module-fns";
@@ -36,6 +37,9 @@ function StepPane() {
 	const { data: modules } = useSuspenseQuery(modulesQuery(user.id, classId));
 	const { data: statusById } = useQuery({ ...progressQuery(user.id, classId), enabled: student });
 
+	const module = modules.find((m) => m.id === step.moduleId);
+	// Gone after a refetch, e.g. its module was deleted.
+	if (!module) return <PaneMessage title="Langkah tidak ditemukan." />;
 	if (student) {
 		return (
 			<StepReader
@@ -47,5 +51,7 @@ function StepPane() {
 			/>
 		);
 	}
-	return null;
+	return (
+		<StepEditor key={step.id} userId={user.id} classId={classId} step={step} dueAt={module.dueAt} />
+	);
 }

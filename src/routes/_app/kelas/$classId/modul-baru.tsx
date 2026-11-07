@@ -2,6 +2,7 @@
 
 import { createFileRoute, notFound } from "@tanstack/react-router";
 import { type } from "arktype";
+import { NewModule } from "#/components/module-form";
 import { PaneMessage } from "#/components/pane-message";
 import { ClassId } from "#/db/ids";
 
@@ -17,5 +18,6 @@ export const Route = createFileRoute("/_app/kelas/$classId/modul-baru")({
 });
 
 function NewModulePane() {
-	return null;
+	const { classId } = Route.useLoaderData();
+	return <NewModule classId={classId} />;
 }

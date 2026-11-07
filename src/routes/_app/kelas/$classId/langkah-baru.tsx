@@ -2,7 +2,9 @@
 
 import { createFileRoute, notFound } from "@tanstack/react-router";
 import { type } from "arktype";
+import { useSuspenseQuery } from "@tanstack/react-query";
 import { PaneMessage } from "#/components/pane-message";
+import { NewStep } from "#/components/step-form";
 import { isStepKind } from "#/components/step-kinds-ui";
 import { ClassId, ModuleId } from "#/db/ids";
 import { modulesQuery } from "#/server/module-fns";
@@ -38,5 +40,19 @@ export const Route = createFileRoute("/_app/kelas/$classId/langkah-baru")({
 });
 
 function NewStepPane() {
-	return null;
+	const { classId, moduleId, kind } = Route.useLoaderData();
+	const { user } = Route.useRouteContext();
+	const { data: modules } = useSuspenseQuery(modulesQuery(user.id, classId));
+	const module = modules.find((m) => m.id === moduleId);
+	if (!module) return <PaneMessage title="Modul tidak ditemukan." />;
+	// Keyed, so picking another kind or module from the syllabus starts a fresh form.
+	return (
+		<NewStep
+			key={`${moduleId}/${kind}`}
+			classId={classId}
+			moduleId={moduleId}
+			kind={kind}
+			dueAt={module.dueAt}
+		/>
+	);
 }
