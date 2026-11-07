@@ -10,9 +10,9 @@ This file is the roadmap. To pick up work, take the first phase that is `in prog
 | ------------------------------- | ----------- | ------------------------- |
 | 0. Repo setup                   | done        | #1 to #5, release #6      |
 | 1. Accounts                     | done        | #7, #11, #15, release #16 |
-| 2. Deploy                       | in progress | #8, #14                   |
-| 3. Classes and invites          | in progress | #9, #18                   |
-| 4. Content: modules and steps   | in progress | #10                       |
+| 2. Deploy                       | in review   | #8, #14, release #20      |
+| 3. Classes and invites          | in review   | #9, #18, release #21      |
+| 4. Content: modules and steps   | in progress | #10, #22                  |
 | 5. Quizzes                      | in progress | #12                       |
 | 6. Assignments and grading      | in progress | #13                       |
 | 7. Discussion and announcements | in progress | #17                       |
