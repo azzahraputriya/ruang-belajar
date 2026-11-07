@@ -59,6 +59,10 @@ export const quizAttempt = pgTable(
 		attemptNumber: integer("attempt_number").notNull(),
 		// The parsed answers, keyed by question id.
 		answers: jsonb("answers").notNull(),
+		// Whether each question was right when graded, keyed by question id. Stored, not recomputed, so a
+		// later edit to a question never changes a past result. Attempts from before this column hold {},
+		// which the screens read as "unknown", not wrong.
+		results: jsonb("results").notNull().default({}),
 		// Percent of questions correct, rounded down. With a whole-number pass score, rounding down
 		// never changes whether an attempt passes.
 		score: integer("score").notNull(),

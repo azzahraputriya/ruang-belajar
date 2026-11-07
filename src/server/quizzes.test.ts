@@ -31,8 +31,8 @@ import {
 	teacherQuiz,
 	updateQuestion,
 } from "#/server/quizzes";
-import { removeMember } from "#/server/classes";
-import { classWithStudent } from "#/test/fixtures";
+import { acceptInvite, removeMember } from "#/server/classes";
+import { classWithStudent, inviteOk, makeUser } from "#/test/fixtures";
 
 type Settings = { maxAttempts?: number; passScore?: number };
 
@@ -285,6 +285,71 @@ describe("attempt limits", () => {
 	});
 });
 
+describe("attempt results", () => {
+	it("are stored per question and come back from getQuiz after a reload", async () => {
+		const { siswa, stepId, choiceQ, numberQ, answers } = await classWithQuiz();
+		await submitOk(siswa, stepId, answers.oneRight);
+		await submitOk(siswa, stepId, { [choiceQ]: "a" });
+		expect(await getQuiz(siswa, stepId)).toMatchObject({
+			ok: true,
+			attempts: [
+				{
+					attemptNumber: 1,
+					score: 50,
+					answers: answers.oneRight,
+					results: { [choiceQ]: true, [numberQ]: false },
+				},
+				{
+					attemptNumber: 2,
+					score: 0,
+					answers: { [choiceQ]: "a" },
+					results: { [choiceQ]: false, [numberQ]: false },
+				},
+			],
+		});
+	});
+
+	it("keep the result they were graded with after the teacher edits the question", async () => {
+		const { guru, siswa, stepId, choiceQ, answers } = await classWithQuiz();
+		await submitOk(siswa, stepId, answers.oneRight);
+		expect(await updateQuestion(guru, choiceQ, pilihan("a"))).toMatchObject({ ok: true });
+		const quiz = await getQuiz(siswa, stepId);
+		if (!quiz.ok) throw new Error(`getQuiz failed: ${quiz.reason}`);
+		expect(quiz.attempts[0]).toMatchObject({ score: 50, results: { [choiceQ]: true } });
+	});
+
+	it("an attempt stored before results existed reads as an empty map, not as wrong", async () => {
+		const { siswa, stepId, choiceQ } = await classWithQuiz();
+		await db.insert(quizAttempt).values({
+			stepId,
+			studentId: siswa,
+			attemptNumber: 1,
+			answers: { [choiceQ]: "b" },
+			score: 50,
+		});
+		expect(await getQuiz(siswa, stepId)).toMatchObject({
+			ok: true,
+			attempts: [{ attemptNumber: 1, results: {} }],
+		});
+	});
+
+	it("a student only ever gets their own attempts", async () => {
+		const { guru, siswa, classId, stepId, answers } = await classWithQuiz();
+		const lain = await makeUser("siswa2");
+		expect(await acceptInvite(lain, await inviteOk(guru, classId, "siswa2"))).toMatchObject({
+			ok: true,
+		});
+		await submitOk(siswa, stepId, answers.oneRight);
+		await submitOk(siswa, stepId, answers.bothWrong);
+		expect(await getQuiz(lain, stepId)).toMatchObject({ ok: true, attempts: [], attemptsLeft: 3 });
+		await submitOk(lain, stepId, answers.bothRight);
+		const mine = await getQuiz(siswa, stepId);
+		if (!mine.ok) throw new Error(`getQuiz failed: ${mine.reason}`);
+		expect(mine.attempts.map((a) => a.score)).toEqual([50, 0]);
+		expect(mine).toMatchObject({ passed: false, reveal: null });
+	});
+});
+
 // Distinctive values that live only in question_key. None may appear in anything a student
 // receives while the quiz is open.
 const MARKERS = {
@@ -384,6 +449,13 @@ describe("answer keys stay on the server", () => {
 		if (!payloads.submit2.ok) throw new Error("submit2 failed");
 		for (const result of payloads.submit2.results) {
 			expect(new Set(Object.keys(result))).toEqual(new Set(["questionId", "correct"]));
+		}
+		if (!payloads.quizAfter.ok) throw new Error("quizAfter failed");
+		for (const attempt of payloads.quizAfter.attempts) {
+			expect(new Set(Object.keys(attempt))).toEqual(
+				new Set(["attemptNumber", "score", "submittedAt", "answers", "results"]),
+			);
+			expect(Object.values(attempt.results).every((r) => typeof r === "boolean")).toBe(true);
 		}
 	});
 
