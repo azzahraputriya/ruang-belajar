@@ -119,7 +119,8 @@ export const STEP_KIND_UI: { [K in StepKind]: KindUi<K> } = {
 					hint="YouTube atau situs lain yang bisa ditampilkan di halaman."
 					error={errors.url}
 					value={value.url}
-					onChange={(e) => onChange({ ...value, url: e.target.value })}
+					// Trimmed as typed, so what the check sees is what gets saved. A link never needs spaces.
+					onChange={(e) => onChange({ ...value, url: e.target.value.trim() })}
 				/>
 				<TextareaField
 					id="instructions"
@@ -133,7 +134,7 @@ export const STEP_KIND_UI: { [K in StepKind]: KindUi<K> } = {
 				/>
 			</>
 		),
-		check: ({ url }) => (isHttps(url.trim()) ? {} : { url: "Isi tautan yang diawali https://." }),
+		check: ({ url }) => (isHttps(url) ? {} : { url: "Isi tautan yang diawali https://." }),
 	},
 };
 

@@ -186,6 +186,9 @@ export function StepEditor({ userId, classId, step, module }: StepEditorProps) {
 			dueAt={module.dueAt}
 			// The kind never changes, so the step's own kind goes with every save.
 			onSave={async (draft) => {
+				// A new save replaces any earlier move or delete error in the bar.
+				move.reset();
+				remove.reset();
 				orThrow(
 					await updateStepFn({ data: { stepId: step.id, step: { kind: step.kind, ...draft } } }),
 				);

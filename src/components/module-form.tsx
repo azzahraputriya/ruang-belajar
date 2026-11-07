@@ -192,6 +192,9 @@ export function ModuleEditor({ classId, module, modules }: ModuleEditorProps) {
 				dueAt: toWibInput(module.dueAt),
 			}}
 			onSave={async (value) => {
+				// A new save replaces any earlier move or delete error in the bar.
+				move.reset();
+				remove.reset();
 				orThrow(await updateModuleFn({ data: { moduleId: module.id, module: value } }));
 				await queryClient.invalidateQueries({ queryKey: ["modules"] });
 			}}
