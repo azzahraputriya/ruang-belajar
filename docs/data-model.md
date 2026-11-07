@@ -109,13 +109,13 @@ Quiz questions are auto-graded only: single choice, multiple choice, number, sho
 
 Each student's status on a step comes from their work rows:
 
-| Status      | When                                                               |
-| ----------- | ------------------------------------------------------------------ |
-| not started | no `StepVisit`, `QuizAttempt`, or `Submission`                     |
-| in progress | visited or attempted, not finished, or a draft submission          |
-| needs help  | quiz attempts used up below the pass score, or submission returned |
-| done        | reading/embed marked done, quiz passed, or work submitted          |
-| graded      | submission graded                                                  |
+| Status      | When                                                                                   |
+| ----------- | -------------------------------------------------------------------------------------- |
+| not started | no `StepVisit`, `QuizAttempt`, or `Submission`                                         |
+| in progress | visited or attempted, not finished, a draft submission, or some discussion posts       |
+| needs help  | quiz attempts used up below the pass score, or submission returned                     |
+| done        | reading/embed marked done, quiz passed, work submitted, or discussion requirements met |
+| graded      | submission graded                                                                      |
 
 A `StepVisit` is an `opened` or `finished` event, and repeats are stored. Status reads the events as a set, so a repeat never changes it.
 
@@ -152,6 +152,17 @@ The table lives in `src/server/submission-lifecycle.ts`, with two more rows: a s
 - Repeating a move that already happened succeeds and changes nothing, like invites: a second submit, or a return or grade with the same comment and score. A return or grade with a different comment or score is refused. Graded is final.
 - Late means the first `submittedAt` is after `dueAt`. Exactly at `dueAt` is on time, and no `dueAt` is never late. A resubmit after a return keeps the first `submittedAt`, so asking for changes after the due date doesn't make the work late.
 - Students see only their own submission. Teachers see every current student's, drafts included.
+
+## Discussions and announcements
+
+`discussion` content is a markdown `prompt`, `requiredPosts` (0 to 10, default 1), and `requiredReplies` (0 to 10, default 0). At least one is above zero.
+
+- A post with no parent starts a thread. A reply's parent is a thread starter, so threads are one level deep. A reply takes its parent's step, so it can't land on another step. A deleted thread takes no new replies.
+- Anyone in the class who can see the step reads and writes posts, teachers included. Students see a discussion only once its module opens, like every other step.
+- Only the author edits a post, which sets `editedAt`. The author or a class teacher deletes it. Deleting is soft (`deletedAt`): the post keeps its place, but reads show only that it was deleted, with no body or author, and its replies stay. Deleting twice succeeds and changes nothing.
+- Reads show the author's display name only, never their username.
+- Status counts the student's own posts that aren't deleted. A post is a thread starter. A reply counts only when it answers someone else's thread, so replying to yourself never meets the requirement. A reply still counts after its thread is deleted. Done when both counts reach the requirement, exactly at it included. The requirements are read live, so a teacher raising them moves a done student back to in progress.
+- Announcements belong to a class. Any teacher of the class writes, edits, or deletes any of them. Deleting is a hard delete. Every member reads them, newest first. They take no comments.
 
 ## AI tutor
 

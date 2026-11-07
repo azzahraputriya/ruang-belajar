@@ -15,7 +15,7 @@ This file is the roadmap. To pick up work, take the first phase that is `in prog
 | 4. Content: modules and steps   | in progress |                      |
 | 5. Quizzes                      | in progress |                      |
 | 6. Assignments and grading      | in progress |                      |
-| 7. Discussion and announcements | not started |                      |
+| 7. Discussion and announcements | in progress |                      |
 | 8. AI tutor                     | not started |                      |
 
 Phases 1 to 8 each end in a working, tested slice. Phase 2 can run alongside phase 3.
