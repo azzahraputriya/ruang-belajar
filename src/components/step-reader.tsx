@@ -1,10 +1,11 @@
-// Owns: the student's view of one step (kind and due date, title, content), the "Selesai, lanjut" bar, and recording that the step was opened. Not here: each kind's content view (src/components/step-kinds-ui.tsx) or the teacher's editor (src/components/step-form.tsx).
+// Owns: the student's view of one step (kind and due date, title, content), the "Selesai, lanjut" bar, and recording that the step was opened. Not here: each kind's content view (src/components/step-kinds-ui.tsx), the quiz screens (src/components/quiz-taker.tsx), or the teacher's editor (src/components/step-form.tsx).
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { ArrowRight } from "lucide-react";
 import { useEffect } from "react";
-import { STEP_KIND_UI, StepView, type ContentOf } from "#/components/step-kinds-ui";
+import { QuizTaker } from "#/components/quiz-taker";
+import { STEP_KIND_UI, StepView } from "#/components/step-kinds-ui";
 import { Button } from "#/components/ui/button";
 import type { StepKind } from "#/db/content-schema";
 import type { ClassId, StepId } from "#/db/ids";
@@ -14,12 +15,12 @@ import { type ModuleWithSteps, orThrow, recordVisitFn } from "#/server/module-fn
 import type { Step } from "#/server/modules";
 import type { StepStatus } from "#/server/step-kinds";
 
-// What a student sees. The teacher's Pratinjau renders this same component.
-export function StepArticle<K extends StepKind>(props: {
-	kind: K;
+// What a student sees around the step's content. The teacher's Pratinjau renders this same component.
+export function StepArticle(props: {
+	kind: StepKind;
 	title: string;
-	content: ContentOf<K>;
 	dueAt: Date | null;
+	children: React.ReactNode;
 	footer?: React.ReactNode;
 }) {
 	return (
@@ -29,13 +30,14 @@ export function StepArticle<K extends StepKind>(props: {
 				{props.dueAt ? ` · tenggat ${formatDay(props.dueAt)}` : null}
 			</p>
 			<h1 className="mb-6 text-2xl font-semibold tracking-tight text-balance">{props.title}</h1>
-			<StepView kind={props.kind} content={props.content} title={props.title} />
+			{props.children}
 			{props.footer}
 		</article>
 	);
 }
 
 type StepReaderProps = {
+	userId: string;
 	classId: ClassId;
 	step: Step;
 	modules: readonly ModuleWithSteps[];
@@ -43,7 +45,7 @@ type StepReaderProps = {
 };
 
 // Render with key={step.id}, so the finish state starts fresh on every step.
-export function StepReader({ classId, step, modules, statusById }: StepReaderProps) {
+export function StepReader({ userId, classId, step, modules, statusById }: StepReaderProps) {
 	const queryClient = useQueryClient();
 	const navigate = useNavigate();
 	const done = isFinished(statusById.get(step.id));
@@ -85,11 +87,19 @@ export function StepReader({ classId, step, modules, statusById }: StepReaderPro
 		note = allDone ? "Semua langkah selesai." : "Ini langkah terakhir.";
 	}
 
+	// A quiz is finished by passing it, not by the student saying so, so it has no "Selesai" bar.
+	if (step.kind === "quiz") {
+		return (
+			<StepArticle kind={step.kind} title={step.title} dueAt={module?.dueAt ?? null}>
+				<QuizTaker userId={userId} classId={classId} stepId={step.id} nextStepId={next?.id} />
+			</StepArticle>
+		);
+	}
+
 	return (
 		<StepArticle
 			kind={step.kind}
 			title={step.title}
-			content={step.content}
 			dueAt={module?.dueAt ?? null}
 			footer={
 				<div className="mt-10 flex flex-wrap items-center justify-end gap-x-4 gap-y-2 border-t pt-4">
@@ -103,6 +113,8 @@ export function StepReader({ classId, step, modules, statusById }: StepReaderPro
 					</Button>
 				</div>
 			}
-		/>
+		>
+			<StepView kind={step.kind} content={step.content} title={step.title} />
+		</StepArticle>
 	);
 }

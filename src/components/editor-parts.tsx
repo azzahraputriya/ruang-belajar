@@ -1,4 +1,4 @@
-// Owns: the pieces the step and module editors share: the top bar with save state, Simpan, and the error line, the move buttons, the delete confirm, and the unsaved-changes guard. Not here: the editors' fields and saving (src/components/step-form.tsx, src/components/module-form.tsx).
+// Owns: the pieces the step and module editors share: the top bar with save state, Simpan, and the error line, the move buttons, the delete confirm, and the unsaved-changes guard and dialog. Not here: the editors' fields and saving (src/components/step-form.tsx, src/components/module-form.tsx).
 
 import { useBlocker } from "@tanstack/react-router";
 import { ArrowDown, ArrowUp, Trash2 } from "lucide-react";
@@ -15,6 +15,17 @@ import {
 	AlertDialogTrigger,
 } from "#/components/ui/alert-dialog";
 import { Button } from "#/components/ui/button";
+import { refusalMessage } from "#/lib/refused";
+import type {
+	createModuleFn,
+	createStepFn,
+	deleteModuleFn,
+	deleteStepFn,
+	reorderModulesFn,
+	reorderStepsFn,
+	updateModuleFn,
+	updateStepFn,
+} from "#/server/module-fns";
 
 type SaveState = { isPending: boolean; isSuccess: boolean; reset: () => void };
 
@@ -22,30 +33,56 @@ type EditorBarProps = {
 	left: React.ReactNode;
 	dirty: boolean;
 	save: SaveState;
-	saveFailed: boolean;
+	saveError: Error | null;
 	// A move or delete from the same pane failed.
-	actionFailed: boolean;
+	actionError: Error | null;
 	actions?: React.ReactNode;
+};
+
+type EditRefusal = Extract<
+	Awaited<
+		ReturnType<
+			| typeof createModuleFn
+			| typeof updateModuleFn
+			| typeof deleteModuleFn
+			| typeof reorderModulesFn
+			| typeof createStepFn
+			| typeof updateStepFn
+			| typeof deleteStepFn
+			| typeof reorderStepsFn
+		>
+	>,
+	{ ok: false }
+>["reason"];
+// Every reason a module or step change can be refused with. A new reason fails to compile until it has a message.
+const REFUSED: Record<EditRefusal, string> = {
+	not_found: "Sudah tidak ada. Muat ulang halaman.",
+	forbidden: "Hanya guru yang bisa mengubah ini.",
+	ids_mismatch: "Urutannya berubah di tempat lain. Muat ulang halaman.",
+	kind_changed: "Jenis langkah tidak bisa diubah.",
 };
 
 // Sits inside the editor's <form>, so Simpan submits it.
 // A failed save is worth retrying. A failed move or delete usually means the list changed
 // elsewhere, so it asks for a reload instead.
-function errorLine(saveFailed: boolean, actionFailed: boolean) {
-	if (saveFailed) return "Tidak bisa menyimpan. Coba lagi.";
-	if (actionFailed) return "Tidak berhasil. Muat ulang halaman, lalu coba lagi.";
+function errorLine(saveError: Error | null, actionError: Error | null) {
+	if (saveError) return refusalMessage(saveError, REFUSED, "Tidak bisa menyimpan. Coba lagi.");
+	if (actionError) {
+		return refusalMessage(
+			actionError,
+			REFUSED,
+			"Tidak berhasil. Muat ulang halaman, lalu coba lagi.",
+		);
+	}
 	return undefined;
 }
 
-export function EditorBar({
-	left,
-	dirty,
-	save,
-	saveFailed,
-	actionFailed,
-	actions,
-}: EditorBarProps) {
-	const error = errorLine(saveFailed, actionFailed);
+// A step draft as compared for "unsaved". The title is saved trimmed, so a trailing space alone doesn't count.
+export const comparableStep = (draft: { title: string; content: unknown }) =>
+	JSON.stringify({ ...draft, title: draft.title.trim() });
+
+export function EditorBar({ left, dirty, save, saveError, actionError, actions }: EditorBarProps) {
+	const error = errorLine(saveError, actionError);
 	const { isSuccess, reset } = save;
 	// "Tersimpan" shows briefly, then the bar goes quiet again.
 	useEffect(() => {
@@ -165,21 +202,22 @@ export function DeleteButton({
 
 const always = () => true;
 
-// While the form has unsaved edits, leaving the page asks first: links and Back get this dialog,
-// closing or reloading the tab gets the browser's own prompt. Navigations that follow a save pass
-// `ignoreBlocker`.
-export function UnsavedChangesGuard({ dirty }: { dirty: boolean }) {
-	const blocker = useBlocker({
-		shouldBlockFn: always,
-		disabled: !dirty,
-		enableBeforeUnload: true,
-		withResolver: true,
-	});
+// "Leave without saving?" Shared by the route guard below and by editors that switch what they show
+// in place, like the quiz editor's question list.
+export function DiscardDialog({
+	open,
+	onStay,
+	onLeave,
+}: {
+	open: boolean;
+	onStay: () => void;
+	onLeave: () => void;
+}) {
 	return (
 		<AlertDialog
-			open={blocker.status === "blocked"}
-			onOpenChange={(open) => {
-				if (!open) blocker.reset?.();
+			open={open}
+			onOpenChange={(next) => {
+				if (!next) onStay();
 			}}
 		>
 			<AlertDialogContent>
@@ -191,11 +229,30 @@ export function UnsavedChangesGuard({ dirty }: { dirty: boolean }) {
 				</AlertDialogHeader>
 				<AlertDialogFooter>
 					<AlertDialogCancel>Tetap di sini</AlertDialogCancel>
-					<AlertDialogAction variant="destructive" onClick={() => blocker.proceed?.()}>
+					<AlertDialogAction variant="destructive" onClick={onLeave}>
 						Tinggalkan
 					</AlertDialogAction>
 				</AlertDialogFooter>
 			</AlertDialogContent>
 		</AlertDialog>
+	);
+}
+
+// While the form has unsaved edits, leaving the page asks first: links and Back get this dialog,
+// closing or reloading the tab gets the browser's own prompt. Navigations that follow a save pass
+// `ignoreBlocker`.
+export function UnsavedChangesGuard({ dirty }: { dirty: boolean }) {
+	const blocker = useBlocker({
+		shouldBlockFn: always,
+		disabled: !dirty,
+		enableBeforeUnload: true,
+		withResolver: true,
+	});
+	return (
+		<DiscardDialog
+			open={blocker.status === "blocked"}
+			onStay={() => blocker.reset?.()}
+			onLeave={() => blocker.proceed?.()}
+		/>
 	);
 }

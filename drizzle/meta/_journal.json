@@ -22,6 +22,20 @@
 			"when": 1793988272678,
 			"tag": "0002_modules",
 			"breakpoints": true
+		},
+		{
+			"idx": 3,
+			"version": "7",
+			"when": 1793991159105,
+			"tag": "0003_quizzes",
+			"breakpoints": true
+		},
+		{
+			"idx": 4,
+			"version": "7",
+			"when": 1794053514595,
+			"tag": "0004_quiz_results",
+			"breakpoints": true
 		}
 	]
 }

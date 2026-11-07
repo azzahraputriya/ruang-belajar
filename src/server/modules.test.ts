@@ -88,7 +88,7 @@ describe("input rules", () => {
 		expect(
 			StepInput({ kind: "embed", title: "x", content: { body: "teks", instructions: "" } }),
 		).toBeInstanceOf(type.errors);
-		expect(StepInput({ kind: "quiz", title: "x", content: {} })).toBeInstanceOf(type.errors);
+		expect(StepInput({ kind: "assignment", title: "x", content: {} })).toBeInstanceOf(type.errors);
 	});
 
 	it("only accepts https URLs for embeds", () => {

@@ -27,6 +27,9 @@ probe console.ts 'eslint(no-console)' 'console.log("hi");\nexport {};\n'
 probe eval.ts 'eslint(no-eval)' 'export const r = eval("1");\n'
 probe BadName.ts 'unicorn(filename-case)' 'export const bad = 1;\n'
 probe no-header.ts 'ruang(file-header)' 'export const n = 1;\n'
+probe key-import.ts 'ruang(question-key-server-only)' '// Owns: probe.\nimport { questionKey } from "#/db/question-key-schema";\nexport const k = questionKey;\n'
+probe key-reexport-fns.ts 'ruang(question-key-server-only)' '// Owns: probe.\nexport * from "#/db/question-key-schema";\n'
+probe quizzes.ts 'ruang(question-key-server-only)' '// Owns: probe.\nexport const load = async () => import("#/db/question-key-schema");\n'
 
 out=$(./node_modules/.bin/oxlint "$dir" 2>&1 || true)
 

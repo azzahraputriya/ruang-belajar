@@ -1,4 +1,4 @@
-// Owns: the teacher's step editor (Tulis and Pratinjau, title and kind fields, client checks) and the wiring that creates, updates, moves, or deletes a step through it. Not here: each kind's fields and view (src/components/step-kinds-ui.tsx) or the student's reader (src/components/step-reader.tsx).
+// Owns: the teacher's step editor (Tulis and Pratinjau, title and kind fields, client checks) and the wiring that creates, updates, moves, or deletes a step through it, for quizzes too. Not here: each kind's fields and view (src/components/step-kinds-ui.tsx), a saved quiz's questions editor (src/components/quiz-editor.tsx), or the student's reader (src/components/step-reader.tsx).
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
@@ -9,14 +9,17 @@ import {
 	EditorBar,
 	MoveButtons,
 	UnsavedChangesGuard,
+	comparableStep,
 } from "#/components/editor-parts";
 import { FormField } from "#/components/form-field";
+import { QuizEditor } from "#/components/quiz-editor";
 import { StepArticle } from "#/components/step-reader";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "#/components/ui/tabs";
 import {
 	type ContentOf,
 	type FieldErrors,
 	StepFields,
+	StepView,
 	checkStepContent,
 	STEP_KIND_UI,
 } from "#/components/step-kinds-ui";
@@ -34,14 +37,6 @@ import type { Step } from "#/server/modules";
 
 type Draft<K extends StepKind> = { title: string; content: ContentOf<K> };
 
-// The title is saved trimmed, so a trailing space alone doesn't count as an unsaved change.
-const comparable = <K extends StepKind>(draft: Draft<K>) =>
-	JSON.stringify({ ...draft, title: draft.title.trim() });
-
-// The generated tabs style `data-active`, but Radix marks the active tab with data-state.
-const ACTIVE_TAB =
-	"data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm";
-
 type StepFormProps<K extends StepKind> = {
 	kind: K;
 	initial: Draft<K>;
@@ -50,7 +45,7 @@ type StepFormProps<K extends StepKind> = {
 	// Throws when the server says no.
 	onSave: (draft: Draft<K>) => Promise<void>;
 	actions?: React.ReactNode;
-	actionFailed?: boolean;
+	actionError?: Error | null;
 };
 
 export function StepForm<K extends StepKind>(props: StepFormProps<K>) {
@@ -59,7 +54,7 @@ export function StepForm<K extends StepKind>(props: StepFormProps<K>) {
 	const [saved, setSaved] = useState(initial);
 	const [preview, setPreview] = useState(false);
 	const [errors, setErrors] = useState<FieldErrors>({});
-	const dirty = comparable(draft) !== comparable(saved);
+	const dirty = comparableStep(draft) !== comparableStep(saved);
 
 	const save = useMutation({
 		mutationFn: onSave,
@@ -92,40 +87,34 @@ export function StepForm<K extends StepKind>(props: StepFormProps<K>) {
 	return (
 		<form method="post" noValidate onSubmit={onSubmit}>
 			<UnsavedChangesGuard dirty={dirty} />
-			{/* Block, not shadcn's default flex: the bar and the pane stack like the rest of the editor. */}
 			<Tabs
-				className="block"
 				value={preview ? "pratinjau" : "tulis"}
 				onValueChange={(value) => setPreview(value === "pratinjau")}
 			>
-				<div className="mx-auto max-w-3xl px-4 pt-6 md:px-8">
+				<div className="mx-auto w-full max-w-3xl px-4 pt-6 md:px-8">
 					<EditorBar
 						dirty={dirty}
 						save={save}
-						saveFailed={save.isError}
-						actionFailed={Boolean(props.actionFailed)}
+						saveError={save.error}
+						actionError={props.actionError ?? null}
 						actions={props.actions}
 						left={
 							<TabsList>
-								<TabsTrigger value="tulis" className={ACTIVE_TAB}>
-									Tulis
-								</TabsTrigger>
-								<TabsTrigger value="pratinjau" className={ACTIVE_TAB}>
-									Pratinjau
-								</TabsTrigger>
+								<TabsTrigger value="tulis">Tulis</TabsTrigger>
+								<TabsTrigger value="pratinjau">Pratinjau</TabsTrigger>
 							</TabsList>
 						}
 					/>
 				</div>
 				<TabsContent value="pratinjau">
-					<StepArticle
-						kind={kind}
-						title={draft.title.trim() || "Tanpa judul"}
-						content={draft.content}
-						dueAt={dueAt}
-					/>
+					<StepArticle kind={kind} title={draft.title.trim() || "Tanpa judul"} dueAt={dueAt}>
+						<StepView kind={kind} content={draft.content} title={draft.title} />
+					</StepArticle>
 				</TabsContent>
-				<TabsContent value="tulis" className="mx-auto grid max-w-3xl gap-5 px-4 pt-3 pb-8 md:px-8">
+				<TabsContent
+					value="tulis"
+					className="mx-auto grid w-full max-w-3xl gap-5 px-4 pt-3 pb-8 md:px-8"
+				>
 					<FormField
 						id="title"
 						label="Judul"
@@ -178,42 +167,62 @@ export function StepEditor({ userId, classId, step, module }: StepEditorProps) {
 		},
 	});
 
+	// The kind never changes, so the step's own kind goes with every save.
+	async function onSave(draft: { title: string; content: unknown }) {
+		// A new save replaces any earlier move or delete error in the bar.
+		move.reset();
+		remove.reset();
+		orThrow(await updateStepFn({ data: { stepId: step.id, step: { kind: step.kind, ...draft } } }));
+		await Promise.all([
+			queryClient.invalidateQueries({ queryKey: ["modules"] }),
+			queryClient.invalidateQueries({ queryKey: ["step", userId, step.id] }),
+		]);
+	}
+	const actions = (
+		<>
+			<MoveButtons
+				ids={module.steps.map((s) => s.id)}
+				id={step.id}
+				what="langkah"
+				pending={move.isPending}
+				onMove={(ids) => move.mutate(ids)}
+			/>
+			<DeleteButton
+				what="langkah"
+				consequence={
+					step.kind === "quiz"
+						? "Soal dan nilai siswa di kuis ini ikut terhapus."
+						: "Catatan baca siswa di langkah ini ikut terhapus."
+				}
+				pending={remove.isPending}
+				onConfirm={() => remove.mutate()}
+			/>
+		</>
+	);
+	const actionError = move.error ?? remove.error;
+
+	// A quiz's questions are rows with their own editor, so it gets a different pane.
+	if (step.kind === "quiz") {
+		return (
+			<QuizEditor
+				userId={userId}
+				stepId={step.id}
+				initial={{ title: step.title, content: step.content }}
+				dueAt={module.dueAt}
+				onSave={onSave}
+				actions={actions}
+				actionError={actionError}
+			/>
+		);
+	}
 	return (
 		<StepForm
 			kind={step.kind}
 			initial={{ title: step.title, content: step.content }}
 			dueAt={module.dueAt}
-			// The kind never changes, so the step's own kind goes with every save.
-			onSave={async (draft) => {
-				// A new save replaces any earlier move or delete error in the bar.
-				move.reset();
-				remove.reset();
-				orThrow(
-					await updateStepFn({ data: { stepId: step.id, step: { kind: step.kind, ...draft } } }),
-				);
-				await Promise.all([
-					queryClient.invalidateQueries({ queryKey: ["modules"] }),
-					queryClient.invalidateQueries({ queryKey: ["step", userId, step.id] }),
-				]);
-			}}
-			actionFailed={move.isError || remove.isError}
-			actions={
-				<>
-					<MoveButtons
-						ids={module.steps.map((s) => s.id)}
-						id={step.id}
-						what="langkah"
-						pending={move.isPending}
-						onMove={(ids) => move.mutate(ids)}
-					/>
-					<DeleteButton
-						what="langkah"
-						consequence="Catatan baca siswa di langkah ini ikut terhapus."
-						pending={remove.isPending}
-						onConfirm={() => remove.mutate()}
-					/>
-				</>
-			}
+			onSave={onSave}
+			actionError={actionError}
+			actions={actions}
 		/>
 	);
 }

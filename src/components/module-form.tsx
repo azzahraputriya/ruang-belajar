@@ -52,10 +52,10 @@ type ModuleFormProps = {
 	// Throws when the server says no.
 	onSave: (value: ModuleValue) => Promise<void>;
 	actions?: React.ReactNode;
-	actionFailed?: boolean;
+	actionError?: Error | null;
 };
 
-function ModuleForm({ heading, initial, onSave, actions, actionFailed }: ModuleFormProps) {
+function ModuleForm({ heading, initial, onSave, actions, actionError }: ModuleFormProps) {
 	const [draft, setDraft] = useState(initial);
 	const [saved, setSaved] = useState(initial);
 	const [errors, setErrors] = useState<FieldErrors>({});
@@ -95,8 +95,8 @@ function ModuleForm({ heading, initial, onSave, actions, actionFailed }: ModuleF
 			<EditorBar
 				dirty={dirty}
 				save={save}
-				saveFailed={save.isError}
-				actionFailed={Boolean(actionFailed)}
+				saveError={save.error}
+				actionError={actionError ?? null}
 				actions={actions}
 				left={<h2 className="px-1 font-medium">{heading}</h2>}
 			/>
@@ -203,7 +203,7 @@ export function ModuleEditor({ classId, module, modules }: ModuleEditorProps) {
 				orThrow(await updateModuleFn({ data: { moduleId: module.id, module: value } }));
 				await queryClient.invalidateQueries({ queryKey: ["modules"] });
 			}}
-			actionFailed={move.isError || remove.isError}
+			actionError={move.error ?? remove.error}
 			actions={
 				<>
 					<MoveButtons

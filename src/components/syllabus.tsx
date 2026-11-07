@@ -1,7 +1,7 @@
 // Owns: the syllabus tree beside the open step (desktop aside and phone bar), with each step's status or kind icon and the teacher's add links. Not here: the panes it links to (src/routes/_app/kelas/$classId/) or reading-order rules (src/lib/reading-order.ts).
 
 import { Link, useLocation, useParams } from "@tanstack/react-router";
-import { Check, ChevronDown, Circle, CircleDashed, Plus } from "lucide-react";
+import { Check, ChevronDown, Circle, CircleAlert, CircleDashed, Plus } from "lucide-react";
 import { useState } from "react";
 import { KindIcon, STEP_KIND_LIST, STEP_KIND_UI } from "#/components/step-kinds-ui";
 import {
@@ -42,6 +42,15 @@ export function StatusIcon({
 				>
 					<Check className="size-[70%]" strokeWidth={3} />
 				</span>
+				{label}
+			</>
+		);
+	}
+	// Amber, so a quiz that ran out of attempts stands out from steps still in progress.
+	if (status === "needs_help") {
+		return (
+			<>
+				<CircleAlert aria-hidden="true" className={`shrink-0 text-amber-600 ${className}`} />
 				{label}
 			</>
 		);
