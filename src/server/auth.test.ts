@@ -63,6 +63,13 @@ describe("accounts", () => {
 		expect(error).toMatchObject({ statusCode: 400 });
 		expect(error instanceof APIError && error.message).not.toContain(budi.password);
 		await expect(signUp({ ...budi, username: "bu di" })).rejects.toThrow();
+		await Promise.all(
+			[".budi", "budi.", "bu..di", "bd"].map((username) =>
+				expect(signUp({ ...budi, username })).rejects.toThrow(),
+			),
+		);
+		const { response } = await signUp({ ...budi, username: "b.u_di" });
+		expect(response.user.email).toBe("b.u_di@users.ruang-belajar.invalid");
 	});
 
 	it("refuses raw sign-up fields signUp() never sends", async () => {
