@@ -179,7 +179,10 @@ function PanelBody({ classId, isTeacher }: { classId: ClassId; isTeacher: boolea
 			await queryClient.invalidateQueries({ queryKey: ["classes"] });
 			await navigate({ to: "/" });
 		},
-		onError: (error) => setMessage(messageFor(error)),
+		onError: (error) => {
+			setMessage(messageFor(error));
+			return refresh(true);
+		},
 	});
 
 	const busy = change.isPending || leave.isPending;
