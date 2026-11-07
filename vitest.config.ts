@@ -11,6 +11,8 @@ if (!new URL(databaseUrl).pathname.endsWith("_test")) {
 export default defineConfig({
 	resolve: { tsconfigPaths: true },
 	test: {
+		// Only this checkout's tests. Agent worktrees under .claude/worktrees/ hold their own copies.
+		include: ["src/**/*.test.ts"],
 		env: {
 			DATABASE_URL: databaseUrl,
 			BETTER_AUTH_SECRET: "test-only-secret-0123456789abcdef",
