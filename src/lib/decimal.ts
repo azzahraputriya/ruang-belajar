@@ -5,10 +5,13 @@
 // large numbers that way and a teacher must be able to save a key back unchanged.
 const DECIMAL = /^[+-]?(\d+(\.\d*)?|\.\d+)(e[+-]?\d+)?$/iu;
 
-// Undefined when the text isn't a plain decimal number, including when it's empty.
+// Undefined when the text isn't a plain decimal number, including when it's empty, and when an exponent
+// overflows to Infinity ("1e999"), which the server refuses.
 export function parseDecimal(text: string) {
 	const plain = text.trim().replace(",", ".");
-	return DECIMAL.test(plain) ? Number(plain) : undefined;
+	if (!DECIMAL.test(plain)) return undefined;
+	const value = Number(plain);
+	return Number.isFinite(value) ? value : undefined;
 }
 
 export const formatDecimal = (value: number) => String(value).replace(".", ",");

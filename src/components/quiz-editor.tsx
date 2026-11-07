@@ -2,11 +2,13 @@
 
 import { useMutation, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { Plus, X } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { flushSync } from "react-dom";
 import {
 	DeleteButton,
 	DiscardDialog,
 	EditorBar,
+	comparableStep,
 	MoveButtons,
 	UnsavedChangesGuard,
 } from "#/components/editor-parts";
@@ -162,7 +164,6 @@ function toPayload(d: QuestionDraft) {
 
 const comparable = (d: QuestionDraft) => JSON.stringify(toPayload(d));
 // The title is saved trimmed, so a trailing space alone isn't an unsaved change.
-const stepComparable = (d: StepDraft) => JSON.stringify({ ...d, title: d.title.trim() });
 
 // Error keys are element ids, so saving can focus the first field that's wrong.
 function checkQuestion(d: QuestionDraft): FieldErrors {
@@ -394,7 +395,7 @@ export function QuizEditor(props: QuizEditorProps) {
 	const [saved, setSaved] = useState(initial);
 	const [stepErrors, setStepErrors] = useState<FieldErrors>({});
 	const [preview, setPreview] = useState(false);
-	const stepDirty = stepComparable(draft) !== stepComparable(saved);
+	const stepDirty = comparableStep(draft) !== comparableStep(saved);
 	const saveStep = useMutation({ mutationFn: onSave, onSuccess: (_, value) => setSaved(value) });
 
 	// The open question. A new question has no id until it's saved.
@@ -470,21 +471,32 @@ export function QuizEditor(props: QuizEditorProps) {
 			...(value.title ? {} : { title: "Isi judul langkah." }),
 			...checkStepContent("quiz", value.content),
 		};
-		setStepErrors(found);
+		// Render the errors before moving focus, so a screen reader reads the field with its error.
+		flushSync(() => setStepErrors(found));
 		if (!focusFirst(event.currentTarget, found)) saveStep.mutate(value);
 	}
 
 	function onSubmitQuestion(event: React.FormEvent<HTMLFormElement>) {
 		event.preventDefault();
 		const found = checkQuestion(qDraft);
-		setQErrors(found);
+		flushSync(() => setQErrors(found));
 		if (focusFirst(event.currentTarget, found)) return;
 		resetQuestionActions();
 		saveQuestion.mutate({ target: selected, value: qDraft });
 	}
 
 	const ids = questions.map((q) => q.id);
-	const number = selected === "new" ? questions.length + 1 : ids.indexOf(selected) + 1;
+	const at = selected === "new" ? questions.length : ids.indexOf(selected);
+	const gone = selected !== "new" && at === -1;
+	const number = gone ? null : at + 1;
+	const heading = number === null ? "Soal" : `Soal ${number}`;
+	// The open question was deleted elsewhere (another tab). With nothing unsaved, open the first one
+	// instead. With unsaved edits, stay: saving then says the question is gone.
+	const firstId = ids[0];
+	useEffect(() => {
+		if (gone && !qDirty) open(firstId ?? "new");
+		// oxlint-disable-next-line react/exhaustive-deps -- open() is recreated every render; this only reacts to the question disappearing.
+	}, [gone, qDirty, firstId]);
 	let qState = "";
 	if (qDirty) qState = "Belum disimpan";
 	else if (saveQuestion.isSuccess) qState = "Tersimpan";
@@ -610,11 +622,11 @@ export function QuizEditor(props: QuizEditorProps) {
 						method="post"
 						noValidate
 						onSubmit={onSubmitQuestion}
-						aria-label={`Soal ${number}`}
+						aria-label={heading}
 						className="grid max-w-2xl content-start gap-4 px-4 py-5 md:px-8"
 					>
 						<div className="flex items-center gap-2">
-							<h2 className="text-sm font-medium">Soal {number}</h2>
+							<h2 className="text-sm font-medium">{heading}</h2>
 							<Select
 								value={qDraft.kind}
 								onValueChange={(value) => {

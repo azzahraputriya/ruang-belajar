@@ -9,6 +9,7 @@ import {
 	EditorBar,
 	MoveButtons,
 	UnsavedChangesGuard,
+	comparableStep,
 } from "#/components/editor-parts";
 import { FormField } from "#/components/form-field";
 import { QuizEditor } from "#/components/quiz-editor";
@@ -36,10 +37,6 @@ import type { Step } from "#/server/modules";
 
 type Draft<K extends StepKind> = { title: string; content: ContentOf<K> };
 
-// The title is saved trimmed, so a trailing space alone doesn't count as an unsaved change.
-const comparable = <K extends StepKind>(draft: Draft<K>) =>
-	JSON.stringify({ ...draft, title: draft.title.trim() });
-
 type StepFormProps<K extends StepKind> = {
 	kind: K;
 	initial: Draft<K>;
@@ -57,7 +54,7 @@ export function StepForm<K extends StepKind>(props: StepFormProps<K>) {
 	const [saved, setSaved] = useState(initial);
 	const [preview, setPreview] = useState(false);
 	const [errors, setErrors] = useState<FieldErrors>({});
-	const dirty = comparable(draft) !== comparable(saved);
+	const dirty = comparableStep(draft) !== comparableStep(saved);
 
 	const save = useMutation({
 		mutationFn: onSave,

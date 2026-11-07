@@ -14,7 +14,19 @@ describe("decimals", () => {
 	});
 
 	it("refuses anything that isn't one plain number", () => {
-		for (const text of ["", " ", "-", "abc", "1.234,5", "1,2,3", "1e", "0x10", "Infinity"]) {
+		for (const text of [
+			"",
+			" ",
+			"-",
+			"abc",
+			"1.234,5",
+			"1,2,3",
+			"1e",
+			"0x10",
+			"Infinity",
+			"1e999",
+			"-1e999",
+		]) {
 			expect({ text, parsed: parseDecimal(text) }).toEqual({ text, parsed: undefined });
 		}
 	});

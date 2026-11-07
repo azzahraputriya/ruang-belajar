@@ -77,6 +77,10 @@ function errorLine(saveError: Error | null, actionError: Error | null) {
 	return undefined;
 }
 
+// A step draft as compared for "unsaved". The title is saved trimmed, so a trailing space alone doesn't count.
+export const comparableStep = (draft: { title: string; content: unknown }) =>
+	JSON.stringify({ ...draft, title: draft.title.trim() });
+
 export function EditorBar({ left, dirty, save, saveError, actionError, actions }: EditorBarProps) {
 	const error = errorLine(saveError, actionError);
 	const { isSuccess, reset } = save;
