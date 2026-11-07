@@ -163,7 +163,6 @@ function toPayload(d: QuestionDraft) {
 }
 
 const comparable = (d: QuestionDraft) => JSON.stringify(toPayload(d));
-// The title is saved trimmed, so a trailing space alone isn't an unsaved change.
 
 // Error keys are element ids, so saving can focus the first field that's wrong.
 function checkQuestion(d: QuestionDraft): FieldErrors {
