@@ -95,7 +95,8 @@ function ModuleForm({ heading, initial, onSave, actions, actionFailed }: ModuleF
 			<EditorBar
 				dirty={dirty}
 				save={save}
-				failed={save.isError || Boolean(actionFailed)}
+				saveFailed={save.isError}
+				actionFailed={Boolean(actionFailed)}
 				actions={actions}
 				left={<h2 className="px-1 font-medium">{heading}</h2>}
 			/>

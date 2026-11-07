@@ -12,6 +12,7 @@ import {
 } from "#/components/editor-parts";
 import { FormField } from "#/components/form-field";
 import { StepArticle } from "#/components/step-reader";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "#/components/ui/tabs";
 import {
 	type ContentOf,
 	type FieldErrors,
@@ -36,9 +37,6 @@ type Draft<K extends StepKind> = { title: string; content: ContentOf<K> };
 // The title is saved trimmed, so a trailing space alone doesn't count as an unsaved change.
 const comparable = <K extends StepKind>(draft: Draft<K>) =>
 	JSON.stringify({ ...draft, title: draft.title.trim() });
-
-const tab = (on: boolean) =>
-	`rounded-md px-2.5 py-1 font-medium ${on ? "bg-muted" : "text-muted-foreground hover:text-foreground"}`;
 
 type StepFormProps<K extends StepKind> = {
 	kind: K;
@@ -90,43 +88,34 @@ export function StepForm<K extends StepKind>(props: StepFormProps<K>) {
 	return (
 		<form method="post" noValidate onSubmit={onSubmit}>
 			<UnsavedChangesGuard dirty={dirty} />
-			<div className="mx-auto max-w-3xl px-4 pt-6 md:px-8">
-				<EditorBar
-					dirty={dirty}
-					save={save}
-					failed={save.isError || Boolean(props.actionFailed)}
-					actions={props.actions}
-					left={
-						<>
-							<button
-								type="button"
-								aria-pressed={!preview}
-								className={tab(!preview)}
-								onClick={() => setPreview(false)}
-							>
-								Tulis
-							</button>
-							<button
-								type="button"
-								aria-pressed={preview}
-								className={tab(preview)}
-								onClick={() => setPreview(true)}
-							>
-								Pratinjau
-							</button>
-						</>
-					}
-				/>
-			</div>
-			{preview ? (
-				<StepArticle
-					kind={kind}
-					title={draft.title.trim() || "Tanpa judul"}
-					content={draft.content}
-					dueAt={dueAt}
-				/>
-			) : (
-				<div className="mx-auto grid max-w-3xl gap-5 px-4 pt-3 pb-8 md:px-8">
+			<Tabs
+				value={preview ? "pratinjau" : "tulis"}
+				onValueChange={(value) => setPreview(value === "pratinjau")}
+			>
+				<div className="mx-auto max-w-3xl px-4 pt-6 md:px-8">
+					<EditorBar
+						dirty={dirty}
+						save={save}
+						saveFailed={save.isError}
+						actionFailed={Boolean(props.actionFailed)}
+						actions={props.actions}
+						left={
+							<TabsList>
+								<TabsTrigger value="tulis">Tulis</TabsTrigger>
+								<TabsTrigger value="pratinjau">Pratinjau</TabsTrigger>
+							</TabsList>
+						}
+					/>
+				</div>
+				<TabsContent value="pratinjau">
+					<StepArticle
+						kind={kind}
+						title={draft.title.trim() || "Tanpa judul"}
+						content={draft.content}
+						dueAt={dueAt}
+					/>
+				</TabsContent>
+				<TabsContent value="tulis" className="mx-auto grid max-w-3xl gap-5 px-4 pt-3 pb-8 md:px-8">
 					<FormField
 						id="title"
 						label="Judul"
@@ -143,8 +132,8 @@ export function StepForm<K extends StepKind>(props: StepFormProps<K>) {
 						onChange={(content) => setDraft({ ...draft, content })}
 						errors={errors}
 					/>
-				</div>
-			)}
+				</TabsContent>
+			</Tabs>
 		</form>
 	);
 }

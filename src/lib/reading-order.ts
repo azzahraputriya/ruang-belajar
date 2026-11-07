@@ -36,7 +36,8 @@ export function nextStep<M extends Ordered>(modules: readonly M[], stepId: StepI
 }
 
 // Where a step sits in its module, for "3 dari 4". `index` counts from 1.
-export function placeInModule<M extends Ordered>(modules: readonly M[], stepId: StepId) {
+// Takes any string, since the id may come straight from the address. An unknown id finds nothing.
+export function placeInModule<M extends Ordered>(modules: readonly M[], stepId: string) {
 	for (const module of modules) {
 		const at = module.steps.findIndex((step) => step.id === stepId);
 		if (at !== -1) return { module, index: at + 1, total: module.steps.length };

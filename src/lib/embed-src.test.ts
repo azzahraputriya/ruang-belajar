@@ -9,13 +9,21 @@ describe("embedSrc", () => {
 	it("turns every YouTube link shape into the embed address", () => {
 		for (const link of [
 			"https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-			"https://youtube.com/watch?v=dQw4w9WgXcQ&t=42s",
 			"https://m.youtube.com/watch?v=dQw4w9WgXcQ",
 			"https://youtu.be/dQw4w9WgXcQ",
 			"https://www.youtube.com/shorts/dQw4w9WgXcQ",
 		]) {
 			expect(embedSrc(link)).toBe(EMBED);
 		}
+	});
+
+	it("keeps the start time a teacher linked to", () => {
+		expect(embedSrc("https://youtu.be/dQw4w9WgXcQ?t=95")).toBe(`${EMBED}?start=95`);
+		expect(embedSrc("https://youtube.com/watch?v=dQw4w9WgXcQ&t=42s")).toBe(`${EMBED}?start=42`);
+		expect(embedSrc("https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=1m35s")).toBe(
+			`${EMBED}?start=95`,
+		);
+		expect(embedSrc("https://youtu.be/dQw4w9WgXcQ?t=abc")).toBe(EMBED);
 	});
 
 	it("leaves other links alone", () => {

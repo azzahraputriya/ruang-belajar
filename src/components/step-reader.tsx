@@ -51,12 +51,15 @@ export function StepReader({ classId, step, modules, statusById }: StepReaderPro
 	const module = modules.find((m) => m.id === step.moduleId);
 
 	// Recorded here, not in the loader: hovering a syllabus link preloads the loader and must not
-	// count as opening. Progress is only shown, so a failed write is ignored.
+	// count as opening. Only the first opening changes the status, so later ones aren't sent.
+	// Progress is only shown, so a failed write is ignored.
+	const unopened = (statusById.get(step.id) ?? "not_started") === "not_started";
 	useEffect(() => {
+		if (!unopened) return;
 		recordVisitFn({ data: { stepId: step.id, event: "opened" } })
 			.then(() => queryClient.invalidateQueries({ queryKey: ["progress"] }))
 			.catch(() => undefined);
-	}, [step.id, queryClient]);
+	}, [unopened, step.id, queryClient]);
 
 	const finish = useMutation({
 		mutationFn: async () => {

@@ -11,6 +11,15 @@ function youtubeId(url: URL) {
 	return section === "shorts" || section === "embed" || section === "live" ? id : undefined;
 }
 
+// YouTube writes a start time as "95", "95s", or "1m35s". Anything else is dropped.
+function startSeconds(url: URL) {
+	const raw = url.searchParams.get("t") ?? url.searchParams.get("start") ?? "";
+	const match = /^(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s?)?$/.exec(raw);
+	if (!raw || !match) return 0;
+	const [, h = "0", m = "0", s = "0"] = match;
+	return Number(h) * 3600 + Number(m) * 60 + Number(s);
+}
+
 // YouTube refuses to be framed from its watch page, so those links become the privacy-friendly embed.
 // Every other site is framed as given. Many refuse too, which is why the view also links out.
 export function embedSrc(raw: string) {
@@ -22,5 +31,7 @@ export function embedSrc(raw: string) {
 		return raw;
 	}
 	const id = youtubeId(url);
-	return id && YOUTUBE_ID.test(id) ? `https://www.youtube-nocookie.com/embed/${id}` : raw;
+	if (!id || !YOUTUBE_ID.test(id)) return raw;
+	const start = startSeconds(url);
+	return `https://www.youtube-nocookie.com/embed/${id}${start ? `?start=${start}` : ""}`;
 }

@@ -12,15 +12,17 @@ import type { StepStatus } from "#/server/step-kinds";
 
 export const Route = createFileRoute("/_app/kelas/$classId/")({
 	// Only reads, so a hover preload is harmless. `replace` keeps Back from bouncing here again.
+	// fetchQuery, not ensureQueryData: progress cached from an earlier visit could resume at a step
+	// already finished elsewhere.
 	loader: async ({ params, parentMatchPromise, context: { queryClient, user } }) => {
 		const classId = ClassId(params.classId);
 		const { loaderData } = await parentMatchPromise;
 		if (classId instanceof type.errors || !loaderData) throw notFound();
 		const student = loaderData.cls.myRole === "student";
 		const [modules, statusById] = await Promise.all([
-			queryClient.ensureQueryData(modulesQuery(user.id, classId)),
+			queryClient.fetchQuery(modulesQuery(user.id, classId)),
 			student
-				? queryClient.ensureQueryData(progressQuery(user.id, classId))
+				? queryClient.fetchQuery(progressQuery(user.id, classId))
 				: new Map<StepId, StepStatus>(),
 		]);
 		const step = resumeStep(modules, statusById);

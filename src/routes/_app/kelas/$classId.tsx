@@ -12,6 +12,9 @@ import { getClassFn, listMembersFn, setLastClassFn } from "#/server/class-fns";
 import { modulesQuery, progressQuery } from "#/server/module-fns";
 
 export const Route = createFileRoute("/_app/kelas/$classId")({
+	// Every step click is a child navigation, which would rerun this loader. The class title and
+	// member count rarely change, so a minute old is fine. Modules and progress have their own queries.
+	staleTime: 60_000,
 	// A malformed id and a class you aren't in end the same way, so non-members learn nothing.
 	loader: async ({ params, context: { queryClient, user } }) => {
 		const classId = ClassId(params.classId);

@@ -4,6 +4,12 @@ import { Link, useLocation, useParams } from "@tanstack/react-router";
 import { Check, ChevronDown, Circle, CircleDashed, Plus } from "lucide-react";
 import { useState } from "react";
 import { KindIcon, STEP_KIND_LIST, STEP_KIND_UI } from "#/components/step-kinds-ui";
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuTrigger,
+} from "#/components/ui/dropdown-menu";
 import type { ClassId, StepId } from "#/db/ids";
 import { isFinished, placeInModule } from "#/lib/reading-order";
 import { formatDay } from "#/lib/wib";
@@ -61,18 +67,17 @@ export type SyllabusProps = {
 const statusOf = (props: SyllabusProps, stepId: StepId) =>
 	props.statusById?.get(stepId) ?? "not_started";
 
-// What the module header says on the right: when it opens if that's later, else the student's
-// count or the teacher's due date.
+// What the module header says on the right. Teachers: when it opens if that's later, else the due
+// date. Students: their count. The server already hides modules that haven't opened for them, so a
+// browser clock running slow can't make an open module look closed.
 function moduleNote(props: SyllabusProps, module: ModuleWithSteps, now: Date) {
-	if (module.opensAt && module.opensAt > now) return `Dibuka ${formatDay(module.opensAt)}`;
-	if (props.teacher) return module.dueAt ? formatDay(module.dueAt) : "";
+	if (props.teacher) {
+		if (module.opensAt && module.opensAt > now) return `Dibuka ${formatDay(module.opensAt)}`;
+		return module.dueAt ? formatDay(module.dueAt) : "";
+	}
 	const done = module.steps.filter((s) => isFinished(statusOf(props, s.id))).length;
 	return `${done}/${module.steps.length}`;
 }
-
-// A link inside an open <details> doesn't close it, so close it by hand.
-const closeMenu = (event: React.MouseEvent<HTMLElement>) =>
-	event.currentTarget.closest("details")?.removeAttribute("open");
 
 const ROW = "mx-2 flex items-center gap-2.5 rounded-md px-2 py-1.5 text-sm hover:bg-muted";
 const ACTIVE = { className: "bg-primary/10 font-medium text-primary hover:bg-primary/10" };
@@ -125,26 +130,25 @@ function SyllabusTree(props: SyllabusProps) {
 							</Link>
 						))}
 						{teacher ? (
-							<details className="mx-2">
-								<summary className="flex h-7 w-fit cursor-pointer list-none items-center gap-1 rounded-md px-2 text-[0.8rem] text-muted-foreground hover:bg-muted [&::-webkit-details-marker]:hidden">
+							<DropdownMenu>
+								<DropdownMenuTrigger className="mx-2 flex h-7 items-center gap-1 rounded-md px-2 text-[0.8rem] text-muted-foreground outline-ring hover:bg-muted focus-visible:outline-2 data-[state=open]:bg-muted">
 									<Plus className="size-3.5" /> Langkah
-								</summary>
-								<div className="grid pt-0.5 pl-4">
+								</DropdownMenuTrigger>
+								<DropdownMenuContent align="start">
 									{STEP_KIND_LIST.map((kind) => (
-										<Link
-											key={kind}
-											to="/kelas/$classId/langkah-baru"
-											params={{ classId }}
-											search={{ modul: m.id, jenis: kind }}
-											onClick={closeMenu}
-											className="flex h-7 items-center gap-2 rounded-md px-2 text-[0.8rem] hover:bg-muted"
-										>
-											<KindIcon kind={kind} className="size-3.5" />
-											{STEP_KIND_UI[kind].label}
-										</Link>
+										<DropdownMenuItem key={kind} asChild>
+											<Link
+												to="/kelas/$classId/langkah-baru"
+												params={{ classId }}
+												search={{ modul: m.id, jenis: kind }}
+											>
+												<KindIcon kind={kind} />
+												{STEP_KIND_UI[kind].label}
+											</Link>
+										</DropdownMenuItem>
 									))}
-								</div>
-							</details>
+								</DropdownMenuContent>
+							</DropdownMenu>
 						) : null}
 					</section>
 				);
@@ -179,8 +183,9 @@ export function SyllabusAside(props: SyllabusProps) {
 export function SyllabusBar(props: SyllabusProps) {
 	const href = useLocation({ select: (l) => l.href });
 	const { stepId } = useParams({ strict: false });
-	const step = props.modules.flatMap((m) => m.steps).find((s) => s.id === stepId);
-	const place = step && placeInModule(props.modules, step.id);
+	// The address is outside input, so it's parsed like any other.
+	const place = stepId ? placeInModule(props.modules, stepId) : undefined;
+	const step = place?.module.steps[place.index - 1];
 	return (
 		<details key={href} className="group border-b md:hidden">
 			<summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-2.5 text-sm [&::-webkit-details-marker]:hidden">

@@ -22,13 +22,30 @@ type EditorBarProps = {
 	left: React.ReactNode;
 	dirty: boolean;
 	save: SaveState;
-	// Any write from this pane failed: save, move, or delete.
-	failed: boolean;
+	saveFailed: boolean;
+	// A move or delete from the same pane failed.
+	actionFailed: boolean;
 	actions?: React.ReactNode;
 };
 
 // Sits inside the editor's <form>, so Simpan submits it.
-export function EditorBar({ left, dirty, save, failed, actions }: EditorBarProps) {
+// A failed save is worth retrying. A failed move or delete usually means the list changed
+// elsewhere, so it asks for a reload instead.
+function errorLine(saveFailed: boolean, actionFailed: boolean) {
+	if (saveFailed) return "Tidak bisa menyimpan. Coba lagi.";
+	if (actionFailed) return "Tidak berhasil. Muat ulang halaman, lalu coba lagi.";
+	return undefined;
+}
+
+export function EditorBar({
+	left,
+	dirty,
+	save,
+	saveFailed,
+	actionFailed,
+	actions,
+}: EditorBarProps) {
+	const error = errorLine(saveFailed, actionFailed);
 	const { isSuccess, reset } = save;
 	// "Tersimpan" shows briefly, then the bar goes quiet again.
 	useEffect(() => {
@@ -50,11 +67,7 @@ export function EditorBar({ left, dirty, save, failed, actions }: EditorBarProps
 					{save.isPending ? "Menyimpan…" : "Simpan"}
 				</Button>
 			</div>
-			<div role="alert">
-				{failed ? (
-					<p className="text-sm text-destructive">Tidak bisa menyimpan. Coba lagi.</p>
-				) : null}
-			</div>
+			<div role="alert">{error ? <p className="text-sm text-destructive">{error}</p> : null}</div>
 		</div>
 	);
 }

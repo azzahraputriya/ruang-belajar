@@ -34,7 +34,7 @@ function ModulePane() {
 	const { user } = Route.useRouteContext();
 	const { data: modules } = useSuspenseQuery(modulesQuery(user.id, classId));
 	const module = modules.find((m) => m.id === moduleId);
-	// Gone after a refetch: deleted here, just before leaving for the class index, or in another tab.
-	if (!module) return null;
+	// Gone after a refetch, e.g. deleted in another tab. Background refetches don't throw, so say it here.
+	if (!module) return <PaneMessage title="Modul tidak ditemukan." />;
 	return <ModuleEditor key={module.id} classId={classId} module={module} modules={modules} />;
 }
