@@ -1,4 +1,4 @@
-// Owns: the small pieces the student's submission sheet and the teacher's grading pane share (file rows, the lateness mark, the rubric line, the return comment, sizes). Not here: either screen (src/components/submission-sheet.tsx, src/components/grading-queue.tsx).
+// Owns: the small pieces the student's submission sheet and the teacher's grading pane share (file rows, the lateness mark, the rubric line, the return comment, the grade result, sizes). Not here: the screens that use them (src/components/submission-sheet.tsx, src/components/submission-pane.tsx).
 
 import { CircleAlert, Download, Paperclip, X } from "lucide-react";
 import { Button } from "#/components/ui/button";
@@ -122,5 +122,55 @@ export function FileList({
 				</li>
 			))}
 		</ul>
+	);
+}
+
+// The grade, with the same type scale as the quiz result, so a score reads the same everywhere.
+// Points are read by criterion id, so a criterion the teacher removed after grading just drops out.
+export function GradeResult({
+	submission,
+	rubric,
+	className,
+}: {
+	submission: SubmissionView;
+	rubric: Rubric | undefined;
+	className: string;
+}) {
+	return (
+		<section aria-label="Nilai" className={className}>
+			<p className="text-xs text-muted-foreground">
+				Nilai{submission.gradedAt ? ` · ${formatDayTime(submission.gradedAt)}` : null}
+			</p>
+			<p className="mt-1">
+				<span className="text-5xl font-semibold tracking-tight tabular-nums">
+					{submission.score}
+				</span>
+				<span className="text-muted-foreground"> / {rubric ? rubricTotal(rubric) : 100}</span>
+			</p>
+			{rubric ? (
+				<ol className="mt-5 border-t">
+					{rubric.map((c) => (
+						<li key={c.id} className="flex items-start gap-3 border-b py-2.5">
+							<div className="grid min-w-0 flex-1 gap-0.5">
+								<p className="text-sm">{c.title}</p>
+								{c.description ? (
+									<p className="text-xs text-muted-foreground">{c.description}</p>
+								) : null}
+							</div>
+							<p className="shrink-0 text-sm tabular-nums">
+								<span className="font-medium">{submission.rubricScores?.[c.id] ?? "–"}</span>
+								<span className="text-muted-foreground"> / {c.maxPoints}</span>
+							</p>
+						</li>
+					))}
+				</ol>
+			) : null}
+			{submission.comment ? (
+				<>
+					<p className="mt-4 text-xs text-muted-foreground">Komentar guru</p>
+					<p className="mt-1 text-sm whitespace-pre-wrap">{submission.comment}</p>
+				</>
+			) : null}
+		</section>
 	);
 }

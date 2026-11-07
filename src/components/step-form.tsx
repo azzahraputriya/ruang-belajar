@@ -1,6 +1,6 @@
-// Owns: the teacher's step editor (Tulis and Pratinjau, title and kind fields, client checks) and the wiring that creates, updates, moves, or deletes a step through it, for quizzes too. Not here: each kind's fields and view (src/components/step-kinds-ui.tsx), a saved quiz's questions editor (src/components/quiz-editor.tsx), or the student's reader (src/components/step-reader.tsx).
+// Owns: the teacher's step editor (Tulis, Pratinjau, and Kiriman for steps that take submissions, title and kind fields, client checks) and the wiring that creates, updates, moves, or deletes a step through it, for quizzes too. Not here: each kind's fields and view (src/components/step-kinds-ui.tsx), a saved quiz's questions editor (src/components/quiz-editor.tsx), or the student's reader (src/components/step-reader.tsx).
 
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { flushSync } from "react-dom";
@@ -14,6 +14,7 @@ import {
 import { FormField } from "#/components/form-field";
 import { QuizEditor } from "#/components/quiz-editor";
 import { StepArticle } from "#/components/step-reader";
+import { SubmissionsTab, waitingOn } from "#/components/submissions-tab";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "#/components/ui/tabs";
 import {
 	type ContentOf,
@@ -22,6 +23,7 @@ import {
 	StepView,
 	checkStepContent,
 	STEP_KIND_UI,
+	takesSubmissions,
 } from "#/components/step-kinds-ui";
 import type { StepKind } from "#/db/content-schema";
 import type { ClassId, ModuleId, StepId } from "#/db/ids";
@@ -34,6 +36,7 @@ import {
 	updateStepFn,
 } from "#/server/module-fns";
 import type { Step } from "#/server/modules";
+import { stepSubmissionsQuery } from "#/server/submission-fns";
 
 type Draft<K extends StepKind> = { title: string; content: ContentOf<K> };
 
@@ -46,13 +49,18 @@ type StepFormProps<K extends StepKind> = {
 	onSave: (draft: Draft<K>) => Promise<void>;
 	actions?: React.ReactNode;
 	actionError?: Error | null;
+	// A third tab after Pratinjau. Its content sits outside the step's <form>, so its own buttons and
+	// inputs never save the step.
+	kiriman?: { label: React.ReactNode; content: React.ReactNode };
 };
+
+type EditorTab = "tulis" | "pratinjau" | "kiriman";
 
 export function StepForm<K extends StepKind>(props: StepFormProps<K>) {
 	const { kind, initial, dueAt, onSave } = props;
 	const [draft, setDraft] = useState(initial);
 	const [saved, setSaved] = useState(initial);
-	const [preview, setPreview] = useState(false);
+	const [tab, setTab] = useState<EditorTab>("tulis");
 	const [errors, setErrors] = useState<FieldErrors>({});
 	const dirty = comparableStep(draft) !== comparableStep(saved);
 
@@ -73,7 +81,7 @@ export function StepForm<K extends StepKind>(props: StepFormProps<K>) {
 		// screen reader reads the field with its error.
 		flushSync(() => {
 			setErrors(found);
-			if (Object.keys(found).length > 0) setPreview(false);
+			if (Object.keys(found).length > 0) setTab("tulis");
 		});
 		const first = Object.keys(found)[0];
 		if (first) {
@@ -85,12 +93,14 @@ export function StepForm<K extends StepKind>(props: StepFormProps<K>) {
 	}
 
 	return (
-		<form method="post" noValidate onSubmit={onSubmit}>
-			<UnsavedChangesGuard dirty={dirty} />
-			<Tabs
-				value={preview ? "pratinjau" : "tulis"}
-				onValueChange={(value) => setPreview(value === "pratinjau")}
-			>
+		<Tabs
+			value={tab}
+			onValueChange={(value) =>
+				setTab(value === "pratinjau" || value === "kiriman" ? value : "tulis")
+			}
+		>
+			<form method="post" noValidate onSubmit={onSubmit}>
+				<UnsavedChangesGuard dirty={dirty} />
 				<div className="mx-auto w-full max-w-3xl px-4 pt-6 md:px-8">
 					<EditorBar
 						dirty={dirty}
@@ -102,6 +112,9 @@ export function StepForm<K extends StepKind>(props: StepFormProps<K>) {
 							<TabsList>
 								<TabsTrigger value="tulis">Tulis</TabsTrigger>
 								<TabsTrigger value="pratinjau">Pratinjau</TabsTrigger>
+								{props.kiriman ? (
+									<TabsTrigger value="kiriman">{props.kiriman.label}</TabsTrigger>
+								) : null}
 							</TabsList>
 						}
 					/>
@@ -132,8 +145,14 @@ export function StepForm<K extends StepKind>(props: StepFormProps<K>) {
 						errors={errors}
 					/>
 				</TabsContent>
-			</Tabs>
-		</form>
+			</form>
+			{/* Kept mounted while hidden, so a half-typed grade and the open student survive a look at Tulis. */}
+			{props.kiriman ? (
+				<TabsContent value="kiriman" forceMount className="data-[state=inactive]:hidden">
+					{props.kiriman.content}
+				</TabsContent>
+			) : null}
+		</Tabs>
 	);
 }
 
@@ -201,6 +220,39 @@ export function StepEditor({ userId, classId, step, module }: StepEditorProps) {
 	);
 	const actionError = move.error ?? remove.error;
 
+	// Assignments and reflections get a Kiriman tab. Its count shares the tab's query, so the whole list
+	// loads with the editor.
+	// ponytail: one class's list is small; add a per-step count query if big classes make this slow.
+	const takesWork = takesSubmissions(step);
+	const { data: students } = useQuery({
+		...stepSubmissionsQuery(userId, step.id),
+		enabled: takesWork,
+	});
+	const waiting = waitingOn(students, step.kind === "assignment");
+	const kiriman = takesWork
+		? {
+				label: (
+					<>
+						Kiriman{" "}
+						{waiting > 0 ? (
+							<span className="text-muted-foreground tabular-nums">{waiting}</span>
+						) : null}
+					</>
+				),
+				content: (
+					<SubmissionsTab
+						userId={userId}
+						stepId={step.id}
+						stepTitle={step.title}
+						dueAt={module.dueAt}
+						// The saved rubric, not the one being edited: grades are checked against what is saved.
+						rubric={step.kind === "assignment" ? step.content.rubric : undefined}
+						scored={step.kind === "assignment"}
+					/>
+				),
+			}
+		: undefined;
+
 	// A quiz's questions are rows with their own editor, so it gets a different pane.
 	if (step.kind === "quiz") {
 		return (
@@ -223,6 +275,7 @@ export function StepEditor({ userId, classId, step, module }: StepEditorProps) {
 			onSave={onSave}
 			actionError={actionError}
 			actions={actions}
+			kiriman={kiriman}
 		/>
 	);
 }

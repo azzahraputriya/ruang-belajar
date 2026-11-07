@@ -5,7 +5,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { ArrowRight } from "lucide-react";
 import { useEffect } from "react";
 import { QuizTaker } from "#/components/quiz-taker";
-import { STEP_KIND_UI, StepView } from "#/components/step-kinds-ui";
+import { STEP_KIND_UI, StepView, takesSubmissions } from "#/components/step-kinds-ui";
 import { SubmissionSheet } from "#/components/submission-sheet";
 import { Button } from "#/components/ui/button";
 import type { StepKind } from "#/db/content-schema";
@@ -89,7 +89,7 @@ export function StepReader({ userId, classId, step, modules, statusById }: StepR
 	}
 
 	// Handing work in is what finishes these, so they have no "Selesai" bar either.
-	if (step.kind === "assignment" || step.kind === "reflection") {
+	if (takesSubmissions(step)) {
 		return (
 			<StepArticle kind={step.kind} title={step.title} dueAt={module?.dueAt ?? null}>
 				<SubmissionSheet

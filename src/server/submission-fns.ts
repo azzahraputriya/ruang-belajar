@@ -104,4 +104,17 @@ export const gradingQueueQuery = (userId: string, classId: ClassId) =>
 			return result;
 		},
 	});
+// Every student of the class with their work on one step, for the step editor's Kiriman tab.
+// Under ["grading"] too, so a grade or return anywhere refreshes it.
+export const stepSubmissionsQuery = (userId: string, stepId: StepId) =>
+	queryOptions({
+		queryKey: ["grading", userId, "step", stepId],
+		retry,
+		queryFn: async () => {
+			const result = await listSubmissionsFn({ data: { stepId } });
+			if (!result.ok) throw notFound();
+			return result.students;
+		},
+	});
+
 export type GradingQueue = Extract<Awaited<ReturnType<typeof gradingQueue>>, { ok: true }>;

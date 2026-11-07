@@ -5,6 +5,7 @@ import { createFileRoute, getRouteApi, notFound } from "@tanstack/react-router";
 import { type } from "arktype";
 import { PaneMessage } from "#/components/pane-message";
 import { StepEditor } from "#/components/step-form";
+import { takesSubmissions } from "#/components/step-kinds-ui";
 import { StepReader } from "#/components/step-reader";
 import { ClassId, StepId } from "#/db/ids";
 import { modulesQuery, progressQuery, stepQuery } from "#/server/module-fns";
@@ -32,7 +33,7 @@ export const Route = createFileRoute("/_app/kelas/$classId/langkah/$stepId")({
 			if (role === "student") await queryClient.ensureQueryData(quizQuery(user.id, stepId));
 			if (role === "teacher") await queryClient.ensureQueryData(teacherQuizQuery(user.id, stepId));
 		}
-		if ((step.kind === "assignment" || step.kind === "reflection") && role === "student") {
+		if (takesSubmissions(step) && role === "student") {
 			await queryClient.ensureQueryData(mySubmissionQuery(user.id, stepId));
 		}
 		return { classId, stepId };

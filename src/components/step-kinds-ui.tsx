@@ -324,5 +324,12 @@ export const checkStepContent = <K extends StepKind>(kind: K, content: ContentOf
 export const isStepKind = (value: unknown): value is StepKind =>
 	typeof value === "string" && Object.hasOwn(STEP_KIND_UI, value);
 
+// Assignments and reflections: the kinds a student hands work in on. Mirrors the server's acceptsOf.
+// Takes the whole step, so the check narrows the step and its content together.
+export const takesSubmissions = <S extends { kind: StepKind }>(
+	step: S,
+): step is Extract<S, { kind: "assignment" | "reflection" }> =>
+	step.kind === "assignment" || step.kind === "reflection";
+
 // Every kind, in the registry's order, for the "+ Langkah" choice.
 export const STEP_KIND_LIST = Object.keys(STEP_KIND_UI).filter(isStepKind);
