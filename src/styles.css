@@ -6,11 +6,16 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/* The shadcn registry writes data-open and data-closed (Base UI's attributes), but our components are
-   Radix, which marks open and closed with data-state. Mapping them here makes every generated sheet,
-   menu, dialog, and select animate as written, without editing the generated files. */
+/* The shadcn registry styles Base UI's attributes (data-open, data-checked, data-horizontal, ...), but our
+   components are Radix, which writes data-state and data-orientation instead. Mapping each one here makes
+   every generated component look as written, without editing the generated files. Variants Radix already
+   sets itself (data-disabled, data-placeholder) need no mapping. */
 @custom-variant data-open (&[data-state="open"]);
 @custom-variant data-closed (&[data-state="closed"]);
+@custom-variant data-checked (&[data-state="checked"]);
+@custom-variant data-active (&[data-state="active"]);
+@custom-variant data-horizontal (&[data-orientation="horizontal"]);
+@custom-variant data-vertical (&[data-orientation="vertical"]);
 
 @theme inline {
 	--font-sans: "Geist Variable", ui-sans-serif, system-ui, sans-serif;

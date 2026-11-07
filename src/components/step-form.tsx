@@ -38,10 +38,6 @@ type Draft<K extends StepKind> = { title: string; content: ContentOf<K> };
 const comparable = <K extends StepKind>(draft: Draft<K>) =>
 	JSON.stringify({ ...draft, title: draft.title.trim() });
 
-// The generated tabs style `data-active`, but Radix marks the active tab with data-state.
-const ACTIVE_TAB =
-	"data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm";
-
 type StepFormProps<K extends StepKind> = {
 	kind: K;
 	initial: Draft<K>;
@@ -92,13 +88,11 @@ export function StepForm<K extends StepKind>(props: StepFormProps<K>) {
 	return (
 		<form method="post" noValidate onSubmit={onSubmit}>
 			<UnsavedChangesGuard dirty={dirty} />
-			{/* Block, not shadcn's default flex: the bar and the pane stack like the rest of the editor. */}
 			<Tabs
-				className="block"
 				value={preview ? "pratinjau" : "tulis"}
 				onValueChange={(value) => setPreview(value === "pratinjau")}
 			>
-				<div className="mx-auto max-w-3xl px-4 pt-6 md:px-8">
+				<div className="mx-auto w-full max-w-3xl px-4 pt-6 md:px-8">
 					<EditorBar
 						dirty={dirty}
 						save={save}
@@ -107,12 +101,8 @@ export function StepForm<K extends StepKind>(props: StepFormProps<K>) {
 						actions={props.actions}
 						left={
 							<TabsList>
-								<TabsTrigger value="tulis" className={ACTIVE_TAB}>
-									Tulis
-								</TabsTrigger>
-								<TabsTrigger value="pratinjau" className={ACTIVE_TAB}>
-									Pratinjau
-								</TabsTrigger>
+								<TabsTrigger value="tulis">Tulis</TabsTrigger>
+								<TabsTrigger value="pratinjau">Pratinjau</TabsTrigger>
 							</TabsList>
 						}
 					/>
@@ -125,7 +115,10 @@ export function StepForm<K extends StepKind>(props: StepFormProps<K>) {
 						dueAt={dueAt}
 					/>
 				</TabsContent>
-				<TabsContent value="tulis" className="mx-auto grid max-w-3xl gap-5 px-4 pt-3 pb-8 md:px-8">
+				<TabsContent
+					value="tulis"
+					className="mx-auto grid w-full max-w-3xl gap-5 px-4 pt-3 pb-8 md:px-8"
+				>
 					<FormField
 						id="title"
 						label="Judul"
