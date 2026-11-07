@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useRouteContext, useRouter } from "@tanstack/react-router";
 import { type } from "arktype";
 import { MoreHorizontal, Users, X } from "lucide-react";
-import { useRef, useState } from "react";
+import { useId, useRef, useState } from "react";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -69,10 +69,6 @@ const REFUSED: Record<Refusal, string> = {
 };
 const GENERIC = "Tidak bisa sekarang. Coba lagi.";
 
-// The generated menu and dialog animate on Base UI attributes Radix never sets, so their fade lives here.
-const FADE_ZOOM =
-	"data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95";
-
 // Server functions here return refusals instead of throwing. Throwing turns them into mutation errors,
 // so each mutation handles refusals and network failures in one onError.
 class Refused extends Error {
@@ -87,7 +83,32 @@ async function orThrow(pending: Promise<{ ok: true } | { ok: false; reason: Refu
 const messageFor = (error: Error) => (error instanceof Refused ? REFUSED[error.reason] : GENERIC);
 
 type Member = Extract<Awaited<ReturnType<typeof listMembersFn>>, { ok: true }>["members"][number];
-type Confirm = { kind: "remove"; member: Member } | { kind: "leave" };
+// Demoting yourself is confirmed too: only another teacher can undo it.
+type Confirm =
+	| { kind: "remove"; member: Member }
+	| { kind: "leave" }
+	| { kind: "demote-self"; member: Member };
+
+const CONFIRM_TEXT: Record<
+	Confirm["kind"],
+	{ title: (c: Confirm) => string; body: string; action: string }
+> = {
+	remove: {
+		title: (c) => (c.kind === "remove" ? `Keluarkan ${c.member.name}?` : ""),
+		body: "Dia perlu diundang lagi untuk kembali.",
+		action: "Keluarkan",
+	},
+	leave: {
+		title: () => "Keluar dari kelas?",
+		body: "Kamu perlu diundang lagi untuk kembali.",
+		action: "Keluar",
+	},
+	"demote-self": {
+		title: () => "Jadikan dirimu siswa?",
+		body: "Hanya guru lain yang bisa menjadikanmu guru lagi.",
+		action: "Jadikan siswa",
+	},
+};
 
 const rtf = new Intl.RelativeTimeFormat("id", { numeric: "auto" });
 // "baru saja", "5 menit yang lalu", "kemarin", "3 hari yang lalu".
@@ -110,12 +131,11 @@ export function MembersPanel({ cls }: { cls: { id: ClassId; myRole: ClassRole } 
 					Anggota
 				</Button>
 			</SheetTrigger>
-			{/* The overlay's own fade targets Base UI attributes Radix never sets, so the slide is added here. */}
 			<SheetContent
 				side="right"
 				showCloseButton={false}
 				aria-describedby={undefined}
-				className="gap-6 overflow-y-auto p-5 data-[side=right]:w-full data-[side=right]:sm:max-w-md data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:slide-out-to-right-10 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:slide-in-from-right-10"
+				className="gap-6 overflow-y-auto p-5 data-[side=right]:w-full data-[side=right]:sm:max-w-md"
 			>
 				<div className="flex items-center justify-between">
 					<SheetTitle className="font-semibold">Anggota</SheetTitle>
@@ -149,15 +169,26 @@ function PanelBody({ classId, isTeacher }: { classId: ClassId; isTeacher: boolea
 	// The router reload updates the header's count and my role, which picks the teacher or student view.
 	const refresh = (header: boolean) =>
 		Promise.all([
-			queryClient.invalidateQueries({ queryKey: ["members"] }),
-			queryClient.invalidateQueries({ queryKey: ["class-invites"] }),
+			queryClient.invalidateQueries({ queryKey: membersQuery(user.id, classId).queryKey }),
+			queryClient.invalidateQueries({
+				queryKey: classInvitesQuery(user.id, classId, isTeacher).queryKey,
+			}),
 			header && router.invalidate(),
 		]);
+	// A refusal like "forbidden" or "not_found" means my role or membership changed elsewhere, so it
+	// reloads the header and role too. Other refusals leave them as they are.
+	const refreshAfter = (error: Error) =>
+		refresh(
+			error instanceof Refused && (error.reason === "forbidden" || error.reason === "not_found"),
+		);
 
 	const revoke = useMutation({
 		mutationFn: (inviteId: InviteId) => orThrow(revokeInviteFn({ data: { inviteId } })),
 		onMutate: () => setMessage(""),
-		onError: (error) => setMessage(messageFor(error)),
+		onError: (error) => {
+			setMessage(messageFor(error));
+			return refreshAfter(error);
+		},
 		// The row and its button disappear, so focus goes back to the invite input.
 		onSettled: () => {
 			inviteInput.current?.focus();
@@ -194,11 +225,15 @@ function PanelBody({ classId, isTeacher }: { classId: ClassId; isTeacher: boolea
 	const list = members.data?.ok ? members.data.members : [];
 	const pending = invites.data?.ok ? invites.data.invites : [];
 	const refused = members.data?.ok === false ? REFUSED[members.data.reason] : "";
-	const loadError = members.isError ? GENERIC : refused;
+	// A failed invites list must say so, or an empty "Menunggu" would look like nothing is pending.
+	const loadError =
+		members.isError || invites.isError || invites.data?.ok === false ? GENERIC : refused;
 
 	function onConfirm() {
 		if (!confirm) return;
 		if (confirm.kind === "leave") return leave.mutate();
+		if (confirm.kind === "demote-self")
+			return change.mutate({ userId: confirm.member.userId, role: "student" });
 		// The removed row and its "⋯" button disappear, so focus moves to the list heading instead.
 		focusListAfterClose.current = true;
 		change.mutate({ userId: confirm.member.userId, role: "remove" });
@@ -207,7 +242,11 @@ function PanelBody({ classId, isTeacher }: { classId: ClassId; isTeacher: boolea
 	return (
 		<>
 			{isTeacher ? (
-				<InviteForm classId={classId} input={inviteInput} onSent={() => refresh(false)} />
+				<InviteForm
+					classId={classId}
+					input={inviteInput}
+					onSent={(error) => (error ? refreshAfter(error) : refresh(false))}
+				/>
 			) : null}
 
 			{isTeacher && pending.length > 0 ? (
@@ -278,15 +317,17 @@ function PanelBody({ classId, isTeacher }: { classId: ClassId; isTeacher: boolea
 											<MoreHorizontal />
 										</Button>
 									</DropdownMenuTrigger>
-									<DropdownMenuContent align="end" className={FADE_ZOOM}>
+									<DropdownMenuContent align="end">
 										{isTeacher ? (
 											<DropdownMenuItem
 												disabled={busy}
 												onSelect={() =>
-													change.mutate({
-														userId: m.userId,
-														role: m.role === "teacher" ? "student" : "teacher",
-													})
+													self && m.role === "teacher"
+														? setConfirm({ kind: "demote-self", member: m })
+														: change.mutate({
+																userId: m.userId,
+																role: m.role === "teacher" ? "student" : "teacher",
+															})
 												}
 											>
 												{m.role === "teacher" ? "Jadikan siswa" : "Jadikan guru"}
@@ -314,7 +355,6 @@ function PanelBody({ classId, isTeacher }: { classId: ClassId; isTeacher: boolea
 			<AlertDialog open={confirm !== null} onOpenChange={(open) => !open && setConfirm(null)}>
 				<AlertDialogContent
 					size="sm"
-					className={FADE_ZOOM}
 					onCloseAutoFocus={(event) => {
 						if (!focusListAfterClose.current) return;
 						focusListAfterClose.current = false;
@@ -324,20 +364,16 @@ function PanelBody({ classId, isTeacher }: { classId: ClassId; isTeacher: boolea
 				>
 					<AlertDialogHeader>
 						<AlertDialogTitle>
-							{confirm?.kind === "remove"
-								? `Keluarkan ${confirm.member.name}?`
-								: "Keluar dari kelas?"}
+							{confirm ? CONFIRM_TEXT[confirm.kind].title(confirm) : ""}
 						</AlertDialogTitle>
 						<AlertDialogDescription>
-							{confirm?.kind === "remove"
-								? "Dia perlu diundang lagi untuk kembali."
-								: "Kamu perlu diundang lagi untuk kembali."}
+							{confirm ? CONFIRM_TEXT[confirm.kind].body : ""}
 						</AlertDialogDescription>
 					</AlertDialogHeader>
 					<AlertDialogFooter>
 						<AlertDialogCancel>Batal</AlertDialogCancel>
 						<AlertDialogAction variant="destructive" onClick={onConfirm}>
-							{confirm?.kind === "remove" ? "Keluarkan" : "Keluar"}
+							{confirm ? CONFIRM_TEXT[confirm.kind].action : ""}
 						</AlertDialogAction>
 					</AlertDialogFooter>
 				</AlertDialogContent>
@@ -353,19 +389,23 @@ function InviteForm({
 }: {
 	classId: ClassId;
 	input: React.RefObject<HTMLInputElement | null>;
-	onSent: () => Promise<unknown>;
+	onSent: (error: Error | null) => Promise<unknown>;
 }) {
 	const [username, setUsername] = useState("");
 	const [role, setRole] = useState<ClassRole>("student");
 	const [message, setMessage] = useState("");
+	// Only a badly typed name marks the field invalid. A refusal like "already invited" is about a
+	// name typed correctly.
+	const [badName, setBadName] = useState(false);
+	const messageId = useId();
 
 	const send = useMutation({
 		mutationFn: (name: string) => orThrow(inviteFn({ data: { classId, username: name, role } })),
 		onSuccess: () => setUsername(""),
 		onError: (error) => setMessage(messageFor(error)),
-		onSettled: async () => {
+		onSettled: async (_, error) => {
 			input.current?.focus();
-			await onSent();
+			await onSent(error);
 		},
 	});
 
@@ -374,13 +414,16 @@ function InviteForm({
 		// The panel shows every username with "@", so people will type it too.
 		const name = username.trim().replace(/^@/, "");
 		setMessage("");
+		setBadName(false);
 		if (!name) {
+			setBadName(true);
 			setMessage("Isi nama pengguna.");
 			input.current?.focus();
 			return;
 		}
 		// A name that breaks the username rules can't belong to anyone, so skip the round trip.
 		if (Username(name) instanceof type.errors) {
+			setBadName(true);
 			setMessage(REFUSED.user_not_found);
 			input.current?.focus();
 			return;
@@ -396,8 +439,8 @@ function InviteForm({
 				onChange={(event) => setUsername(event.target.value)}
 				placeholder="Nama pengguna"
 				aria-label="Nama pengguna"
-				aria-invalid={message ? true : undefined}
-				aria-describedby="invite-message"
+				aria-invalid={badName ? true : undefined}
+				aria-describedby={messageId}
 				autoComplete="off"
 				autoCapitalize="none"
 				spellCheck={false}
@@ -419,7 +462,7 @@ function InviteForm({
 					Undang
 				</Button>
 			</div>
-			<output id="invite-message" className="block">
+			<output id={messageId} className="block">
 				{message ? <p className="text-sm text-destructive">{message}</p> : null}
 			</output>
 		</form>
