@@ -1,4 +1,4 @@
-// Owns: the better-auth server setup and the sign-up rules (username, name, password, the placeholder email). Not here: the HTTP route (src/routes/api/auth/$.ts) or browser code (src/lib/auth-client.ts).
+// Owns: the better-auth server setup, the placeholder email, and enforcing the sign-up rules on the public auth route. Not here: the rules themselves (src/lib/sign-up-rules.ts), the HTTP route (src/routes/api/auth/$.ts), or browser code (src/lib/auth-client.ts).
 
 import { type } from "arktype";
 import { APIError, betterAuth } from "better-auth";
@@ -9,19 +9,7 @@ import { tanstackStartCookies } from "better-auth/tanstack-start";
 import { db } from "#/db/client";
 import * as schema from "#/db/schema";
 import { env } from "#/env";
-
-// Accepts any case and stores lowercase, so "Budi" and "budi" are the same account.
-const Username = type("string.lower")
-	.to(/^[a-z0-9_.]{3,30}$/)
-	.describe("3 to 30 letters, digits, _ or .");
-
-const Name = type("string.trim").to("1 <= string <= 80");
-const PASSWORD = { min: 8, max: 128 };
-
-const Password = type("string").atLeastLength(PASSWORD.min).atMostLength(PASSWORD.max);
-
-export const SignUpInput = type({ username: Username, name: Name, password: Password });
-export type SignUpInput = typeof SignUpInput.inferIn;
+import { PASSWORD, Password, SignUpInput, Username } from "#/lib/sign-up-rules";
 
 // better-auth needs an email on every user. This one can never receive mail.
 export const emailForUsername = (name: string) => `${name}@users.ruang-belajar.invalid`;
