@@ -1,5 +1,6 @@
-// Owns: the server functions the class screens call, which find the signed-in user and parse input, plus the last-opened-class cookie. Not here: the class rules themselves (src/server/classes.ts).
+// Owns: the server functions the class screens call, which find the signed-in user and parse input, the queries that cache them in the browser, plus the last-opened-class cookie. Not here: the class rules themselves (src/server/classes.ts).
 
+import { queryOptions } from "@tanstack/react-query";
 import { createServerFn } from "@tanstack/react-start";
 import { getCookie, getRequest, setCookie } from "@tanstack/react-start/server";
 import { type } from "arktype";
@@ -110,3 +111,14 @@ export const setLastClassFn = createServerFn({ method: "POST" })
 		});
 		return { ok: true } as const;
 	});
+
+// Keys hold no user id, so sign-out clears the whole cache instead.
+export const myClassesQuery = queryOptions({
+	queryKey: ["classes"],
+	queryFn: () => listMyClassesFn(),
+});
+
+export const myInvitesQuery = queryOptions({
+	queryKey: ["invites"],
+	queryFn: () => listMyPendingInvitesFn(),
+});
