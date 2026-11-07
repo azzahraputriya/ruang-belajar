@@ -38,6 +38,10 @@ type Draft<K extends StepKind> = { title: string; content: ContentOf<K> };
 const comparable = <K extends StepKind>(draft: Draft<K>) =>
 	JSON.stringify({ ...draft, title: draft.title.trim() });
 
+// The generated tabs style `data-active`, but Radix marks the active tab with data-state.
+const ACTIVE_TAB =
+	"data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm";
+
 type StepFormProps<K extends StepKind> = {
 	kind: K;
 	initial: Draft<K>;
@@ -88,7 +92,9 @@ export function StepForm<K extends StepKind>(props: StepFormProps<K>) {
 	return (
 		<form method="post" noValidate onSubmit={onSubmit}>
 			<UnsavedChangesGuard dirty={dirty} />
+			{/* Block, not shadcn's default flex: the bar and the pane stack like the rest of the editor. */}
 			<Tabs
+				className="block"
 				value={preview ? "pratinjau" : "tulis"}
 				onValueChange={(value) => setPreview(value === "pratinjau")}
 			>
@@ -101,8 +107,12 @@ export function StepForm<K extends StepKind>(props: StepFormProps<K>) {
 						actions={props.actions}
 						left={
 							<TabsList>
-								<TabsTrigger value="tulis">Tulis</TabsTrigger>
-								<TabsTrigger value="pratinjau">Pratinjau</TabsTrigger>
+								<TabsTrigger value="tulis" className={ACTIVE_TAB}>
+									Tulis
+								</TabsTrigger>
+								<TabsTrigger value="pratinjau" className={ACTIVE_TAB}>
+									Pratinjau
+								</TabsTrigger>
 							</TabsList>
 						}
 					/>
