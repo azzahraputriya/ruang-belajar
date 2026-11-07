@@ -79,27 +79,32 @@ export const STEP_KIND_UI: { [K in StepKind]: KindUi<K> } = {
 		View: ({ content, title }) => (
 			<div className="grid gap-4">
 				{content.instructions ? <Markdown>{content.instructions}</Markdown> : null}
-				<iframe
-					src={embedSrc(content.url)}
-					title={title}
-					className="aspect-video w-full rounded-lg border bg-muted"
-					// allow-same-origin gives the framed page its own origin's storage, not ours. YouTube and most
-					// simulations need it with scripts to play. A same-origin URL is just this app, which the student can open anyway.
-					// oxlint-disable-next-line react/iframe-missing-sandbox -- the reason is above.
-					sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
-					loading="lazy"
-					referrerPolicy="strict-origin-when-cross-origin"
-					allowFullScreen
-				/>
-				{/* Many sites refuse to be framed, so there is always a way out. */}
-				<a
-					href={content.url}
-					target="_blank"
-					rel="noopener noreferrer"
-					className="inline-flex items-center gap-1.5 justify-self-start text-sm font-medium text-primary underline-offset-4 hover:underline"
-				>
-					Buka di tab baru <ExternalLink className="size-3.5" />
-				</a>
+				{/* Saved links are always https. Only a teacher's Pratinjau can hold a half-typed one. */}
+				{isHttps(content.url) ? (
+					<>
+						<iframe
+							src={embedSrc(content.url)}
+							title={title}
+							className="aspect-video w-full rounded-lg border bg-muted"
+							// allow-same-origin gives the framed page its own origin's storage, not ours. YouTube and most
+							// simulations need it with scripts to play. A same-origin URL is just this app, which the student can open anyway.
+							// oxlint-disable-next-line react/iframe-missing-sandbox -- the reason is above.
+							sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
+							loading="lazy"
+							referrerPolicy="strict-origin-when-cross-origin"
+							allowFullScreen
+						/>
+						{/* Many sites refuse to be framed, so there is always a way out. */}
+						<a
+							href={content.url}
+							target="_blank"
+							rel="noopener noreferrer"
+							className="inline-flex items-center gap-1.5 justify-self-start text-sm font-medium text-primary underline-offset-4 hover:underline"
+						>
+							Buka di tab baru <ExternalLink className="size-3.5" />
+						</a>
+					</>
+				) : null}
 			</div>
 		),
 		Fields: ({ value, onChange, errors }) => (
