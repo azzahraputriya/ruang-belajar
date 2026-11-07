@@ -20,3 +20,13 @@ export type UserId = typeof UserId.infer;
 
 export const QuestionId = type("string.uuid").brand("QuestionId");
 export type QuestionId = typeof QuestionId.infer;
+
+export const SubmissionId = type("string.uuid").brand("SubmissionId");
+export type SubmissionId = typeof SubmissionId.infer;
+
+export const SubmissionFileId = type("string.uuid").brand("SubmissionFileId");
+export type SubmissionFileId = typeof SubmissionFileId.infer;
+
+// Where an upload's bytes live in file storage. Always a uuid we made, never a path from a user.
+export const StorageKey = type("string.uuid").brand("StorageKey");
+export type StorageKey = typeof StorageKey.infer;

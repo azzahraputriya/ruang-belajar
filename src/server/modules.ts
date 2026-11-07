@@ -15,6 +15,7 @@ import {
 import { db } from "#/db/client";
 import type { ClassId, ModuleId, StepId, UserId } from "#/db/ids";
 import { quizAttempt } from "#/db/quiz-schema";
+import { submission } from "#/db/submission-schema";
 import { type Conn, NOT_FOUND, OK, type Tx, fail, lockClass, roleIn } from "#/server/class-access";
 import { STEP_KINDS, type StepWork, parseStepContent, stepStatus } from "#/server/step-kinds";
 
@@ -355,12 +356,12 @@ export async function recordVisit(actor: UserId, stepId: StepId, event: VisitEve
 	return OK;
 }
 
-// What each student has done on each step of the class: the visit events, and the scores of their
-// quiz attempts. One student when `studentId` is given, everyone otherwise.
+// What each student has done on each step of the class: the visit events, the scores of their
+// quiz attempts, and their submission's status. One student when `studentId` is given, everyone otherwise.
 async function workInClass(classId: ClassId, studentId?: UserId) {
 	const inClass = (student: Column) =>
 		and(eq(moduleTable.classId, classId), studentId ? eq(student, studentId) : undefined);
-	const [visitRows, attemptRows] = await Promise.all([
+	const [visitRows, attemptRows, submissionRows] = await Promise.all([
 		db
 			.selectDistinct({
 				stepId: stepVisit.stepId,
@@ -381,7 +382,20 @@ async function workInClass(classId: ClassId, studentId?: UserId) {
 			.innerJoin(step, eq(step.id, quizAttempt.stepId))
 			.innerJoin(moduleTable, eq(moduleTable.id, step.moduleId))
 			.where(inClass(quizAttempt.studentId)),
+		db
+			.select({
+				stepId: submission.stepId,
+				studentId: submission.studentId,
+				status: submission.status,
+			})
+			.from(submission)
+			.innerJoin(step, eq(step.id, submission.stepId))
+			.innerJoin(moduleTable, eq(moduleTable.id, step.moduleId))
+			.where(inClass(submission.studentId)),
 	]);
+	const submissions = new Map(
+		submissionRows.map((row) => [`${row.stepId}/${row.studentId}`, row.status]),
+	);
 	const visits = new Map<string, Set<VisitEvent>>();
 	for (const row of visitRows) {
 		const key = `${row.stepId}/${row.studentId}`;
@@ -397,6 +411,7 @@ async function workInClass(classId: ClassId, studentId?: UserId) {
 	return (stepId: StepId, student: UserId): StepWork => ({
 		visits: visits.get(`${stepId}/${student}`) ?? new Set(),
 		scores: scores.get(`${stepId}/${student}`) ?? [],
+		submission: submissions.get(`${stepId}/${student}`) ?? null,
 	});
 }
 
