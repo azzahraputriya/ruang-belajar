@@ -1,7 +1,8 @@
 // Owns: every module, step, and step visit operation with its membership check and input rules, the step access checks quizzes and submissions reuse, removing a deleted step's uploads from disk, plus the progress queries. Not here: each kind's content shape and status rule (src/server/step-kinds.ts), quiz questions and attempts (src/server/quizzes.ts), submissions (src/server/submissions.ts), or session wiring (src/server/module-fns.ts).
 
 import { type } from "arktype";
-import { type Column, type SQL, and, asc, eq, gt, sql } from "drizzle-orm";
+import { type Column, type SQL, and, asc, eq, gt, isNull, sql } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import { user } from "#/db/auth-schema.gen";
 import { type ClassRole, classMember } from "#/db/class-schema";
 import {
@@ -13,6 +14,7 @@ import {
 	visitEvent,
 } from "#/db/content-schema";
 import { db } from "#/db/client";
+import { discussionPost } from "#/db/discussion-schema";
 import type { ClassId, ModuleId, StepId, UserId } from "#/db/ids";
 import { quizAttempt } from "#/db/quiz-schema";
 import { submission, submissionFile } from "#/db/submission-schema";
@@ -378,12 +380,14 @@ export async function recordVisit(actor: UserId, stepId: StepId, event: VisitEve
 	return OK;
 }
 
+const parentPost = alias(discussionPost, "parent_post");
+
 // What each student has done on each step of the class: the visit events, the scores of their
-// quiz attempts, and their submission's status. One student when `studentId` is given, everyone otherwise.
+// quiz attempts, their submission's status, and their discussion posts that count. One student when `studentId` is given, everyone otherwise.
 async function workInClass(classId: ClassId, studentId?: UserId) {
 	const inClass = (student: Column) =>
 		and(eq(moduleTable.classId, classId), studentId ? eq(student, studentId) : undefined);
-	const [visitRows, attemptRows, submissionRows] = await Promise.all([
+	const [visitRows, attemptRows, submissionRows, postRows] = await Promise.all([
 		db
 			.selectDistinct({
 				stepId: stepVisit.stepId,
@@ -414,7 +418,23 @@ async function workInClass(classId: ClassId, studentId?: UserId) {
 			.innerJoin(step, eq(step.id, submission.stepId))
 			.innerJoin(moduleTable, eq(moduleTable.id, step.moduleId))
 			.where(inClass(submission.studentId)),
+		// A reply to your own thread doesn't count, so a student can't meet the reply requirement
+		// by talking to themselves. A reply still counts after its parent is deleted.
+		db
+			.select({
+				stepId: discussionPost.stepId,
+				studentId: discussionPost.authorId,
+				posts: sql<number>`count(*) filter (where ${discussionPost.parentId} is null)::int`,
+				replies: sql<number>`count(*) filter (where ${parentPost.authorId} <> ${discussionPost.authorId})::int`,
+			})
+			.from(discussionPost)
+			.leftJoin(parentPost, eq(parentPost.id, discussionPost.parentId))
+			.innerJoin(step, eq(step.id, discussionPost.stepId))
+			.innerJoin(moduleTable, eq(moduleTable.id, step.moduleId))
+			.where(and(inClass(discussionPost.authorId), isNull(discussionPost.deletedAt)))
+			.groupBy(discussionPost.stepId, discussionPost.authorId),
 	]);
+	const posts = new Map(postRows.map((row) => [`${row.stepId}/${row.studentId}`, row]));
 	const submissions = new Map(
 		submissionRows.map((row) => [`${row.stepId}/${row.studentId}`, row.status]),
 	);
@@ -434,6 +454,8 @@ async function workInClass(classId: ClassId, studentId?: UserId) {
 		visits: visits.get(`${stepId}/${student}`) ?? new Set(),
 		scores: scores.get(`${stepId}/${student}`) ?? [],
 		submission: submissions.get(`${stepId}/${student}`) ?? null,
+		posts: posts.get(`${stepId}/${student}`)?.posts ?? 0,
+		replies: posts.get(`${stepId}/${student}`)?.replies ?? 0,
 	});
 }
 
