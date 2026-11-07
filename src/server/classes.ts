@@ -1,4 +1,4 @@
-// Owns: every class, member, and invite operation, with its membership check and its input rules. Not here: the invite transition table (src/server/invite-lifecycle.ts) or session and cookie wiring (src/server/class-fns.ts).
+// Owns: every class, member, and invite operation, with its membership check and its input rules. Not here: the invite transition table (src/server/invite-lifecycle.ts), the shared membership lookup and class lock (src/server/class-access.ts), or session and cookie wiring (src/server/class-fns.ts).
 
 import { type } from "arktype";
 import { and, count, desc, eq, getTableColumns } from "drizzle-orm";
@@ -7,6 +7,7 @@ import { type ClassRole, classInvite, classMember, classRole, classTable } from 
 import { db } from "#/db/client";
 import { type ClassId, type InviteId, UserId } from "#/db/ids";
 import { Username } from "#/lib/sign-up-rules";
+import { NOT_FOUND, OK, fail, lockClass, roleIn } from "#/server/class-access";
 import { type InviteAction, decideInvite } from "#/server/invite-lifecycle";
 
 export const ClassRoleInput = type.enumerated(...classRole.enumValues);
@@ -19,35 +20,6 @@ export type CreateClassInput = typeof CreateClassInput.infer;
 
 export const InviteInput = type({ username: Username, role: ClassRoleInput.default("student") });
 export type InviteInput = typeof InviteInput.infer;
-
-type Fail<R extends string> = { ok: false; reason: R };
-const fail = <R extends string>(reason: R): Fail<R> => ({ ok: false, reason });
-// A missing class and a class you aren't in give this same value, so non-members learn nothing.
-const NOT_FOUND = Object.freeze(fail("not_found"));
-const OK = { ok: true } as const;
-
-type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
-
-async function roleIn(conn: typeof db | Tx, classId: ClassId, userId: UserId) {
-	const [row] = await conn
-		.select({ role: classMember.role })
-		.from(classMember)
-		.where(and(eq(classMember.classId, classId), eq(classMember.userId, userId)));
-	return row?.role;
-}
-
-// Changes that depend on who teaches take this lock first. They then run one at a time per class,
-// and every read after it sees the changes that committed while it waited.
-// "no key update", not "update": it still blocks other lockClass calls, but not the foreign-key
-// check of an accept inserting a member. "update" deadlocks an accept against a parallel invite().
-async function lockClass(tx: Tx, classId: ClassId) {
-	const [locked] = await tx
-		.select({ id: classTable.id })
-		.from(classTable)
-		.where(eq(classTable.id, classId))
-		.for("no key update");
-	return locked !== undefined;
-}
 
 // The creator becomes the first teacher in the same transaction, so a class never exists without one.
 export async function createClass(actor: UserId, input: CreateClassInput) {

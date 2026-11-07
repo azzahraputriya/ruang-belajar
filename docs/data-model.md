@@ -70,6 +70,12 @@ A step is a tagged union. `kind` picks the shape of `content` and what the stude
 | `reflection` | prompt                                             | `Submission` (text)    | no                       |
 | `discussion` | prompt, required posts and replies                 | `DiscussionPost`       | no                       |
 
+Each kind is one entry in `src/server/step-kinds.ts`: its content shape, whether the student marks it finished, and how its status is computed. Adding a kind is one value in the `step_kind` enum (a migration) plus one entry there.
+
+- `reading` content is a markdown `body`. Images are markdown image links until uploads arrive with assignments.
+- `embed` content is an https `url` and markdown `instructions`. Other schemes are refused.
+- A step's kind can't change after it is created.
+
 Quiz questions are auto-graded only: single choice, multiple choice, number, short exact answer. Essays are an `assignment`. The old physics final test (8 choice + 7 essay) becomes one quiz step and one assignment step.
 
 ## Answer keys stay on the server
@@ -87,6 +93,18 @@ Each student's status on a step comes from their work rows:
 | needs help  | quiz attempts used up below the pass score, or submission returned |
 | done        | reading/embed marked done, quiz passed, or work submitted          |
 | graded      | submission graded                                                  |
+
+A `StepVisit` is an `opened` or `finished` event, and repeats are stored. Status reads the events as a set, so a repeat never changes it.
+
+- `finished` without an earlier `opened` still counts as done.
+- Only students record visits. A teacher gets `forbidden`.
+- `finished` is only allowed on kinds the student marks done themselves.
+
+## Modules and order
+
+- Modules are ordered within a class and steps within a module. Positions are always 0 to n-1. A delete closes the gap.
+- A reorder sends the full list of ids. It is refused, and nothing moves, unless the list has exactly the current ids, each once.
+- A student sees a module only once its `opensAt` has passed, or when it has none. Before that, its steps are `not_found` to students. Teachers see every module.
 
 ## Submission lifecycle
 

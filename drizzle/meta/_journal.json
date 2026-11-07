@@ -15,6 +15,13 @@
 			"when": 1793986746984,
 			"tag": "0001_classes",
 			"breakpoints": true
+		},
+		{
+			"idx": 2,
+			"version": "7",
+			"when": 1793988272678,
+			"tag": "0002_modules",
+			"breakpoints": true
 		}
 	]
 }
