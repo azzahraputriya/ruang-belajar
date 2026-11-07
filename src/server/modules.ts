@@ -1,7 +1,7 @@
-// Owns: every module, step, and step visit operation with its membership check and input rules, the step access checks quizzes reuse, plus the progress queries. Not here: each kind's content shape and status rule (src/server/step-kinds.ts), quiz questions and attempts (src/server/quizzes.ts), or session wiring (src/server/module-fns.ts).
+// Owns: every module, step, and step visit operation with its membership check and input rules, the step access checks quizzes and submissions reuse, removing a deleted step's uploads from disk, plus the progress queries. Not here: each kind's content shape and status rule (src/server/step-kinds.ts), quiz questions and attempts (src/server/quizzes.ts), submissions (src/server/submissions.ts), or session wiring (src/server/module-fns.ts).
 
 import { type } from "arktype";
-import { type Column, and, asc, eq, gt, sql } from "drizzle-orm";
+import { type Column, type SQL, and, asc, eq, gt, sql } from "drizzle-orm";
 import { user } from "#/db/auth-schema.gen";
 import { type ClassRole, classMember } from "#/db/class-schema";
 import {
@@ -15,7 +15,9 @@ import {
 import { db } from "#/db/client";
 import type { ClassId, ModuleId, StepId, UserId } from "#/db/ids";
 import { quizAttempt } from "#/db/quiz-schema";
+import { submission, submissionFile } from "#/db/submission-schema";
 import { type Conn, NOT_FOUND, OK, type Tx, fail, lockClass, roleIn } from "#/server/class-access";
+import { removeLeftovers } from "#/server/file-storage";
 import { STEP_KINDS, type StepWork, parseStepContent, stepStatus } from "#/server/step-kinds";
 
 const Title = type("string.trim").to("1 <= string <= 200");
@@ -59,6 +61,7 @@ async function moduleFor(conn: Conn, actor: UserId, moduleId: ModuleId) {
 		.select({
 			classId: moduleTable.classId,
 			opensAt: moduleTable.opensAt,
+			dueAt: moduleTable.dueAt,
 			position: moduleTable.position,
 		})
 		.from(moduleTable)
@@ -185,10 +188,23 @@ export async function updateModule(actor: UserId, moduleId: ModuleId, input: Mod
 	});
 }
 
+// The storage keys of every file handed in on the matching steps. Read before a delete cascades
+// their rows away, so the bytes can be removed from disk after it commits.
+async function uploadsUnder(tx: Tx, stepsWhere: SQL) {
+	const rows = await tx
+		.select({ key: submissionFile.storageKey })
+		.from(submissionFile)
+		.innerJoin(submission, eq(submission.id, submissionFile.submissionId))
+		.innerJoin(step, eq(step.id, submission.stepId))
+		.where(stepsWhere);
+	return rows.map((r) => r.key);
+}
+
 export async function deleteModule(actor: UserId, moduleId: ModuleId) {
-	return db.transaction(async (tx) => {
+	const done = await db.transaction(async (tx) => {
 		const access = await writeModule(tx, actor, moduleId);
 		if (!access.ok) return access;
+		const keys = await uploadsUnder(tx, eq(step.moduleId, moduleId));
 		await tx.delete(moduleTable).where(eq(moduleTable.id, moduleId));
 		await tx
 			.update(moduleTable)
@@ -196,8 +212,11 @@ export async function deleteModule(actor: UserId, moduleId: ModuleId) {
 			.where(
 				and(eq(moduleTable.classId, access.classId), gt(moduleTable.position, access.position)),
 			);
-		return OK;
+		return { ok: true, keys } as const;
 	});
+	if (!done.ok) return done;
+	await removeLeftovers(done.keys);
+	return OK;
 }
 
 export async function reorderModules(actor: UserId, classId: ClassId, orderedIds: ModuleId[]) {
@@ -260,16 +279,20 @@ export async function updateStep(actor: UserId, stepId: StepId, input: StepInput
 }
 
 export async function deleteStep(actor: UserId, stepId: StepId) {
-	return db.transaction(async (tx) => {
+	const done = await db.transaction(async (tx) => {
 		const access = await writeStep(tx, actor, stepId);
 		if (!access.ok) return access;
+		const keys = await uploadsUnder(tx, eq(step.id, stepId));
 		await tx.delete(step).where(eq(step.id, stepId));
 		await tx
 			.update(step)
 			.set({ position: sql`${step.position} - 1` })
 			.where(and(eq(step.moduleId, access.moduleId), gt(step.position, access.stepPosition)));
-		return OK;
+		return { ok: true, keys } as const;
 	});
+	if (!done.ok) return done;
+	await removeLeftovers(done.keys);
+	return OK;
 }
 
 export async function reorderSteps(actor: UserId, moduleId: ModuleId, orderedIds: StepId[]) {
@@ -355,12 +378,12 @@ export async function recordVisit(actor: UserId, stepId: StepId, event: VisitEve
 	return OK;
 }
 
-// What each student has done on each step of the class: the visit events, and the scores of their
-// quiz attempts. One student when `studentId` is given, everyone otherwise.
+// What each student has done on each step of the class: the visit events, the scores of their
+// quiz attempts, and their submission's status. One student when `studentId` is given, everyone otherwise.
 async function workInClass(classId: ClassId, studentId?: UserId) {
 	const inClass = (student: Column) =>
 		and(eq(moduleTable.classId, classId), studentId ? eq(student, studentId) : undefined);
-	const [visitRows, attemptRows] = await Promise.all([
+	const [visitRows, attemptRows, submissionRows] = await Promise.all([
 		db
 			.selectDistinct({
 				stepId: stepVisit.stepId,
@@ -381,7 +404,20 @@ async function workInClass(classId: ClassId, studentId?: UserId) {
 			.innerJoin(step, eq(step.id, quizAttempt.stepId))
 			.innerJoin(moduleTable, eq(moduleTable.id, step.moduleId))
 			.where(inClass(quizAttempt.studentId)),
+		db
+			.select({
+				stepId: submission.stepId,
+				studentId: submission.studentId,
+				status: submission.status,
+			})
+			.from(submission)
+			.innerJoin(step, eq(step.id, submission.stepId))
+			.innerJoin(moduleTable, eq(moduleTable.id, step.moduleId))
+			.where(inClass(submission.studentId)),
 	]);
+	const submissions = new Map(
+		submissionRows.map((row) => [`${row.stepId}/${row.studentId}`, row.status]),
+	);
 	const visits = new Map<string, Set<VisitEvent>>();
 	for (const row of visitRows) {
 		const key = `${row.stepId}/${row.studentId}`;
@@ -397,6 +433,7 @@ async function workInClass(classId: ClassId, studentId?: UserId) {
 	return (stepId: StepId, student: UserId): StepWork => ({
 		visits: visits.get(`${stepId}/${student}`) ?? new Set(),
 		scores: scores.get(`${stepId}/${student}`) ?? [],
+		submission: submissions.get(`${stepId}/${student}`) ?? null,
 	});
 }
 

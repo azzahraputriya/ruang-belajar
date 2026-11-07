@@ -5,3 +5,4 @@ export * from "./auth-schema.gen";
 export * from "./class-schema";
 export * from "./content-schema";
 export * from "./quiz-schema";
+export * from "./submission-schema";
