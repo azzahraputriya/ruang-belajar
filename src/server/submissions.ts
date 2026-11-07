@@ -154,12 +154,18 @@ export async function writeOwn(tx: Tx, actor: UserId, stepId: StepId) {
 		.where(eq(step.id, stepId));
 	if (!found || !(await lockClass(tx, found.classId))) return NOT_FOUND;
 	// Read again under the lock: membership, the step, or the module may have changed while we waited.
-	const access = await stepFor(tx, actor, stepId);
+	return ownSubmission(tx, actor, stepId);
+}
+
+// The acting student's submission on a step they can see that takes submissions, if they have one.
+// Teachers get "forbidden", and people who shouldn't learn the step exists get "not_found".
+export async function ownSubmission(conn: Conn, actor: UserId, stepId: StepId) {
+	const access = await stepFor(conn, actor, stepId);
 	if (!access) return NOT_FOUND;
 	if (access.role !== "student") return fail("forbidden");
 	const accepts = acceptsOf(contentOf(access.step));
 	if (!accepts) return fail("not_a_submission_step");
-	const [row] = await tx
+	const [row] = await conn
 		.select()
 		.from(submission)
 		.where(and(eq(submission.stepId, stepId), eq(submission.studentId, actor)));
@@ -184,20 +190,14 @@ async function writeAsTeacher(tx: Tx, actor: UserId, submissionId: SubmissionId)
 
 // The acting student's own submission on a step, or null before they start one.
 export async function getMySubmission(actor: UserId, stepId: StepId) {
-	const access = await stepFor(db, actor, stepId);
-	if (!access) return NOT_FOUND;
-	if (access.role !== "student") return fail("forbidden");
-	const accepts = acceptsOf(contentOf(access.step));
-	if (!accepts) return fail("not_a_submission_step");
-	const [row] = await db
-		.select()
-		.from(submission)
-		.where(and(eq(submission.stepId, stepId), eq(submission.studentId, actor)));
+	const access = await ownSubmission(db, actor, stepId);
+	if (!access.ok) return access;
+	const { accepts, dueAt, row } = access;
 	return {
 		ok: true,
 		accepts,
-		dueAt: access.dueAt,
-		submission: row ? await viewOf(db, row, access.dueAt) : null,
+		dueAt,
+		submission: row ? await viewOf(db, row, dueAt) : null,
 	} as const;
 }
 

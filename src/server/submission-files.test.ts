@@ -19,6 +19,7 @@ import { ModuleInput, StepInput, createModule, createStep, deleteStep } from "#/
 import {
 	FILE_LIMITS,
 	allowedType,
+	cleanFilename,
 	contentDisposition,
 	deleteFile,
 	handleDownload,
@@ -126,6 +127,11 @@ describe("file types", () => {
 		expect(allowedType("halaman.html", "text/html", bytesOf("<script>"))).toBeUndefined();
 		expect(allowedType("biner.txt", "text/plain", bytesOf("a", [0], "b"))).toBeUndefined();
 		expect(allowedType("biner.txt", "text/plain", bytesOf([0xff, 0xfe]))).toBeUndefined();
+	});
+
+	it("keeps only the last part of a name, without hidden characters", () => {
+		expect(cleanFilename("C:\\tugas\\lap\u202eoran\u0007.pdf")).toBe("laporan.pdf");
+		expect(cleanFilename("../../")).toBe("berkas");
 	});
 
 	it("names downloads safely, keeping the real name for modern browsers", () => {

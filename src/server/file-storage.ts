@@ -45,3 +45,10 @@ export function diskStorage(root: string): FileStorage {
 }
 
 export const storage = diskStorage(env.UPLOAD_DIR);
+
+// Removes bytes whose rows are already gone. Runs after the delete committed, so a failure here
+// must not turn that delete into an error. A key that won't go stays behind, as after a crash.
+// shortcut: leftover bytes are never found again. Add a sweep of keys with no row if disk gets tight.
+export async function removeLeftovers(keys: readonly StorageKey[]) {
+	await Promise.allSettled(keys.map((key) => storage.remove(key)));
+}

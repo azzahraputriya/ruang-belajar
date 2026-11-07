@@ -8,10 +8,10 @@ import { StepId, StorageKey, SubmissionFileId, UserId } from "#/db/ids";
 import { submission, submissionFile } from "#/db/submission-schema";
 import { auth } from "#/server/auth";
 import { NOT_FOUND, fail } from "#/server/class-access";
-import { storage } from "#/server/file-storage";
+import { removeLeftovers, storage } from "#/server/file-storage";
 import { stepFor } from "#/server/modules";
 import { decideSubmission } from "#/server/submission-lifecycle";
-import { writeOwn } from "#/server/submissions";
+import { ownSubmission, writeOwn } from "#/server/submissions";
 
 export const FILE_LIMITS = { maxBytes: 10 * 1024 * 1024, perSubmission: 5 } as const;
 
@@ -59,10 +59,13 @@ const FILE_TYPES: Record<string, { mime: string; looksRight: (bytes: Uint8Array)
 	txt: { mime: "text/plain", looksRight: isUtf8Text },
 };
 
-// The name shown back to people. Only the last path part, without control characters.
+// The name shown back to people. Only the last path part, without control characters or the
+// direction marks that can make "rpt.exe.pdf" read as something else.
 export function cleanFilename(name: string) {
-	// oxlint-disable-next-line no-control-regex -- Stripping control characters is the point.
-	const base = (name.split(/[/\\]/).pop() ?? "").replace(/[\u0000-\u001f\u007f]/g, "").trim();
+	const base = (name.split(/[/\\]/).pop() ?? "")
+		// oxlint-disable-next-line no-control-regex -- Stripping control characters is the point.
+		.replace(/[\u0000-\u001f\u007f‎‏‪-‮⁦-⁩]/g, "")
+		.trim();
 	return base.slice(-200) || "berkas";
 }
 
@@ -78,9 +81,13 @@ export function allowedType(filename: string, declared: string, bytes: Uint8Arra
 // Adds a file to the acting student's submission on the step, starting a draft if there is none.
 // The bytes go to storage before the transaction, so no disk write runs under the class lock.
 // When the transaction refuses or fails, the bytes are removed again.
-// shortcut: a crash between put and the transaction leaves bytes with no row. Add a sweep of unknown keys if disk gets tight.
 export async function uploadFile(actor: UserId, stepId: StepId, file: File) {
 	if (file.size > FILE_LIMITS.maxBytes) return fail("file_too_large");
+	// A first check without the lock, so people who may not upload here never get bytes onto disk.
+	// The transaction checks again under the lock.
+	const early = await ownSubmission(db, actor, stepId);
+	if (!early.ok) return early;
+	if (!early.accepts.files) return fail("files_not_accepted");
 	const filename = cleanFilename(file.name);
 	const bytes = new Uint8Array(await file.arrayBuffer());
 	const mimeType = allowedType(filename, file.type, bytes);
@@ -106,6 +113,7 @@ export async function uploadFile(actor: UserId, stepId: StepId, file: File) {
 				.from(submissionFile)
 				.where(eq(submissionFile.submissionId, row.id));
 			if (files >= FILE_LIMITS.perSubmission) return fail("too_many_files");
+			await tx.update(submission).set({ updatedAt: new Date() }).where(eq(submission.id, row.id));
 			const [created] = await tx
 				.insert(submissionFile)
 				.values({ submissionId: row.id, storageKey: key, filename, mimeType, size: bytes.length })
@@ -119,10 +127,10 @@ export async function uploadFile(actor: UserId, stepId: StepId, file: File) {
 			if (!created) throw new Error("Inserting a file returned no row");
 			return { ok: true, file: created } as const;
 		});
-		if (!result.ok) await storage.remove(key);
+		if (!result.ok) await removeLeftovers([key]);
 		return result;
 	} catch (error) {
-		await storage.remove(key);
+		await removeLeftovers([key]);
 		throw error;
 	}
 }
@@ -147,10 +155,15 @@ export async function deleteFile(actor: UserId, fileId: SubmissionFileId) {
 			.delete(submissionFile)
 			.where(eq(submissionFile.id, fileId))
 			.returning({ key: submissionFile.storageKey });
-		return deleted ? ({ ok: true, key: deleted.key } as const) : NOT_FOUND;
+		if (!deleted) return NOT_FOUND;
+		await tx
+			.update(submission)
+			.set({ updatedAt: new Date() })
+			.where(eq(submission.id, access.row.id));
+		return { ok: true, key: deleted.key } as const;
 	});
 	if (!done.ok) return done;
-	await storage.remove(done.key);
+	await removeLeftovers([done.key]);
 	return { ok: true } as const;
 }
 
@@ -170,9 +183,9 @@ export async function openFile(actor: UserId, fileId: SubmissionFileId) {
 	const allowed =
 		access?.role === "teacher" || (access?.role === "student" && found.studentId === actor);
 	if (!allowed) return undefined;
+	// No bytes means a delete committed between the row read and this one, so the file is gone.
 	const bytes = await storage.read(found.file.storageKey);
-	if (!bytes) throw new Error(`File ${fileId} has a row but no bytes in storage`);
-	return { file: found.file, bytes };
+	return bytes && { file: found.file, bytes };
 }
 
 async function actorOf(request: Request) {

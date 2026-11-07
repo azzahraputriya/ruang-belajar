@@ -13,11 +13,11 @@ import {
 	visitEvent,
 } from "#/db/content-schema";
 import { db } from "#/db/client";
-import type { ClassId, ModuleId, StepId, StorageKey, UserId } from "#/db/ids";
+import type { ClassId, ModuleId, StepId, UserId } from "#/db/ids";
 import { quizAttempt } from "#/db/quiz-schema";
 import { submission, submissionFile } from "#/db/submission-schema";
 import { type Conn, NOT_FOUND, OK, type Tx, fail, lockClass, roleIn } from "#/server/class-access";
-import { storage } from "#/server/file-storage";
+import { removeLeftovers } from "#/server/file-storage";
 import { STEP_KINDS, type StepWork, parseStepContent, stepStatus } from "#/server/step-kinds";
 
 const Title = type("string.trim").to("1 <= string <= 200");
@@ -200,11 +200,6 @@ async function uploadsUnder(tx: Tx, stepsWhere: SQL) {
 	return rows.map((r) => r.key);
 }
 
-// shortcut: a crash between the commit and this leaves the bytes on disk with no row. Add a sweep of unknown keys if disk gets tight.
-async function removeUploads(keys: readonly StorageKey[]) {
-	await Promise.all(keys.map((key) => storage.remove(key)));
-}
-
 export async function deleteModule(actor: UserId, moduleId: ModuleId) {
 	const done = await db.transaction(async (tx) => {
 		const access = await writeModule(tx, actor, moduleId);
@@ -220,7 +215,7 @@ export async function deleteModule(actor: UserId, moduleId: ModuleId) {
 		return { ok: true, keys } as const;
 	});
 	if (!done.ok) return done;
-	await removeUploads(done.keys);
+	await removeLeftovers(done.keys);
 	return OK;
 }
 
@@ -296,7 +291,7 @@ export async function deleteStep(actor: UserId, stepId: StepId) {
 		return { ok: true, keys } as const;
 	});
 	if (!done.ok) return done;
-	await removeUploads(done.keys);
+	await removeLeftovers(done.keys);
 	return OK;
 }
 
