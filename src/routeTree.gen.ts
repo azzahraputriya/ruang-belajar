@@ -9,15 +9,37 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as IndexRouteImport } from './routes/index'
+import { Route as AppRouteImport } from './routes/_app'
+import { Route as AuthRouteImport } from './routes/_auth'
+import { Route as AppIndexRouteImport } from './routes/_app/index'
+import { Route as AuthDaftarRouteImport } from './routes/_auth/daftar'
+import { Route as AuthMasukRouteImport } from './routes/_auth/masuk'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as ApiFilesFileIdRouteImport } from './routes/api/files/$fileId'
 import { Route as ApiFilesUploadStepIdRouteImport } from './routes/api/files/upload/$stepId'
 
-const IndexRoute = IndexRouteImport.update({
+const AppRoute = AppRouteImport.update({
+  id: '/_app',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthRoute = AuthRouteImport.update({
+  id: '/_auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AppIndexRoute = AppIndexRouteImport.update({
   id: '/',
   path: '/',
-  getParentRoute: () => rootRouteImport,
+  getParentRoute: () => AppRoute,
+} as any)
+const AuthDaftarRoute = AuthDaftarRouteImport.update({
+  id: '/daftar',
+  path: '/daftar',
+  getParentRoute: () => AuthRoute,
+} as any)
+const AuthMasukRoute = AuthMasukRouteImport.update({
+  id: '/masuk',
+  path: '/masuk',
+  getParentRoute: () => AuthRoute,
 } as any)
 const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   id: '/api/auth/$',
@@ -36,20 +58,28 @@ const ApiFilesUploadStepIdRoute = ApiFilesUploadStepIdRouteImport.update({
 } as any)
 
 export interface FileRoutesByFullPath {
-  '/': typeof IndexRoute
+  '/': typeof AppIndexRoute
+  '/daftar': typeof AuthDaftarRoute
+  '/masuk': typeof AuthMasukRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/files/$fileId': typeof ApiFilesFileIdRoute
   '/api/files/upload/$stepId': typeof ApiFilesUploadStepIdRoute
 }
 export interface FileRoutesByTo {
-  '/': typeof IndexRoute
+  '/': typeof AppIndexRoute
+  '/daftar': typeof AuthDaftarRoute
+  '/masuk': typeof AuthMasukRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/files/$fileId': typeof ApiFilesFileIdRoute
   '/api/files/upload/$stepId': typeof ApiFilesUploadStepIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
-  '/': typeof IndexRoute
+  '/_app': typeof AppRouteWithChildren
+  '/_auth': typeof AuthRouteWithChildren
+  '/_auth/daftar': typeof AuthDaftarRoute
+  '/_auth/masuk': typeof AuthMasukRoute
+  '/_app/': typeof AppIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/files/$fileId': typeof ApiFilesFileIdRoute
   '/api/files/upload/$stepId': typeof ApiFilesUploadStepIdRoute
@@ -57,19 +87,35 @@ export interface FileRoutesById {
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
-    '/' | '/api/auth/$' | '/api/files/$fileId' | '/api/files/upload/$stepId'
+    | '/'
+    | '/daftar'
+    | '/masuk'
+    | '/api/auth/$'
+    | '/api/files/$fileId'
+    | '/api/files/upload/$stepId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/api/auth/$' | '/api/files/$fileId' | '/api/files/upload/$stepId'
+  to:
+    | '/'
+    | '/daftar'
+    | '/masuk'
+    | '/api/auth/$'
+    | '/api/files/$fileId'
+    | '/api/files/upload/$stepId'
   id:
     | '__root__'
-    | '/'
+    | '/_app'
+    | '/_auth'
+    | '/_auth/daftar'
+    | '/_auth/masuk'
+    | '/_app/'
     | '/api/auth/$'
     | '/api/files/$fileId'
     | '/api/files/upload/$stepId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
-  IndexRoute: typeof IndexRoute
+  AppRoute: typeof AppRouteWithChildren
+  AuthRoute: typeof AuthRouteWithChildren
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
   ApiFilesFileIdRoute: typeof ApiFilesFileIdRoute
   ApiFilesUploadStepIdRoute: typeof ApiFilesUploadStepIdRoute
@@ -77,12 +123,40 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/': {
-      id: '/'
+    '/_app': {
+      id: '/_app'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AppRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_auth': {
+      id: '/_auth'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_app/': {
+      id: '/_app/'
       path: '/'
       fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
-      parentRoute: typeof rootRouteImport
+      preLoaderRoute: typeof AppIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_auth/daftar': {
+      id: '/_auth/daftar'
+      path: '/daftar'
+      fullPath: '/daftar'
+      preLoaderRoute: typeof AuthDaftarRouteImport
+      parentRoute: typeof AuthRoute
+    }
+    '/_auth/masuk': {
+      id: '/_auth/masuk'
+      path: '/masuk'
+      fullPath: '/masuk'
+      preLoaderRoute: typeof AuthMasukRouteImport
+      parentRoute: typeof AuthRoute
     }
     '/api/auth/$': {
       id: '/api/auth/$'
@@ -108,8 +182,31 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface AppRouteChildren {
+  AppIndexRoute: typeof AppIndexRoute
+}
+
+const AppRouteChildren: AppRouteChildren = {
+  AppIndexRoute: AppIndexRoute,
+}
+
+const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
+
+interface AuthRouteChildren {
+  AuthDaftarRoute: typeof AuthDaftarRoute
+  AuthMasukRoute: typeof AuthMasukRoute
+}
+
+const AuthRouteChildren: AuthRouteChildren = {
+  AuthDaftarRoute: AuthDaftarRoute,
+  AuthMasukRoute: AuthMasukRoute,
+}
+
+const AuthRouteWithChildren = AuthRoute._addFileChildren(AuthRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
-  IndexRoute: IndexRoute,
+  AppRoute: AppRouteWithChildren,
+  AuthRoute: AuthRouteWithChildren,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
   ApiFilesFileIdRoute: ApiFilesFileIdRoute,
   ApiFilesUploadStepIdRoute: ApiFilesUploadStepIdRoute,
