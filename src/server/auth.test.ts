@@ -3,17 +3,9 @@
 import { APIError } from "better-auth";
 import { describe, expect, it } from "vitest";
 import { auth, emailForUsername, signUp } from "#/server/auth";
+import { cookiesFrom } from "#/test/fixtures";
 
 const budi = { username: "budi", name: "Budi Santoso", password: "rahasia-123" };
-
-// The Cookie header a browser would send back after these Set-Cookie headers.
-function cookiesFrom(headers: Headers) {
-	const cookie = headers
-		.getSetCookie()
-		.map((line) => line.split(";")[0])
-		.join("; ");
-	return new Headers({ cookie });
-}
 
 describe("accounts", () => {
 	it("signs up, reads the session, and signs out", async () => {

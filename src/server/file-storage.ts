@@ -10,7 +10,7 @@ import { env } from "#/env";
 export type FileStorage = {
 	put: (key: StorageKey, bytes: Uint8Array) => Promise<void>;
 	// Undefined when nothing is stored under the key.
-	read: (key: StorageKey) => Promise<Uint8Array | undefined>;
+	read: (key: StorageKey) => Promise<Uint8Array<ArrayBuffer> | undefined>;
 	// Removing a key that isn't there succeeds, so a retried delete is harmless.
 	remove: (key: StorageKey) => Promise<void>;
 };

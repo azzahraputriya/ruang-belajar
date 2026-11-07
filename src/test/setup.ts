@@ -1,8 +1,10 @@
-// Owns: giving every test an empty database and closing the connection after each file. Not here: migrations (src/test/global-setup.ts).
+// Owns: giving every test an empty database and an empty uploads folder, and closing the connection after each file. Not here: migrations (src/test/global-setup.ts).
 
+import { rm } from "node:fs/promises";
 import { sql } from "drizzle-orm";
 import { afterAll, beforeEach } from "vitest";
 import { db } from "#/db/client";
+import { env } from "#/env";
 
 // Empties every app table, so new tables need no change here. Migration history lives outside "public".
 beforeEach(async () => {
@@ -13,6 +15,7 @@ beforeEach(async () => {
 			IF tables IS NOT NULL THEN EXECUTE 'TRUNCATE ' || tables || ' CASCADE'; END IF;
 		END $$
 	`);
+	await rm(env.UPLOAD_DIR, { recursive: true, force: true });
 });
 
 afterAll(async () => {

@@ -1,12 +1,32 @@
-// Owns: helpers that build users and classes for database tests. Not here: per-test cleanup (src/test/setup.ts).
+// Owns: helpers that build users, signed-in cookies, and classes for database tests. Not here: per-test cleanup (src/test/setup.ts).
 
 import { type ClassId, UserId } from "#/db/ids";
-import { signUp } from "#/server/auth";
+import { auth, signUp } from "#/server/auth";
 import { CreateClassInput, InviteInput, acceptInvite, createClass, invite } from "#/server/classes";
 
+const PASSWORD = "rahasia-123";
+
 export async function makeUser(username: string) {
-	const { response } = await signUp({ username, name: username, password: "rahasia-123" });
+	const { response } = await signUp({ username, name: username, password: PASSWORD });
 	return UserId.assert(response.user.id);
+}
+
+// The Cookie header a browser would send back after these Set-Cookie headers.
+export function cookiesFrom(headers: Headers) {
+	const cookie = headers
+		.getSetCookie()
+		.map((line) => line.split(";")[0])
+		.join("; ");
+	return new Headers({ cookie });
+}
+
+// A signed-in browser's Cookie header for a user made by makeUser.
+export async function cookieFor(username: string) {
+	const { headers } = await auth.api.signInUsername({
+		body: { username, password: PASSWORD },
+		returnHeaders: true,
+	});
+	return cookiesFrom(headers);
 }
 
 export async function makeClass(teacher: UserId, title = "Fisika X-1") {

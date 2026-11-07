@@ -13,3 +13,5 @@ __unconfig*
 todos.json
 .playwright-mcp/
 .claude/worktrees/
+# Local uploads (UPLOAD_DIR default)
+/data/
