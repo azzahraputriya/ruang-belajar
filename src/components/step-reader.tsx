@@ -1,11 +1,12 @@
-// Owns: the student's view of one step (kind and due date, title, content), the "Selesai, lanjut" bar, and recording that the step was opened. Not here: each kind's content view (src/components/step-kinds-ui.tsx), the quiz screens (src/components/quiz-taker.tsx), or the teacher's editor (src/components/step-form.tsx).
+// Owns: the student's view of one step (kind and due date, title, content), the "Selesai, lanjut" bar, and recording that the step was opened. Not here: each kind's content view (src/components/step-kinds-ui.tsx), the quiz screens (src/components/quiz-taker.tsx), the assignment and reflection sheet (src/components/submission-sheet.tsx), or the teacher's editor (src/components/step-form.tsx).
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { ArrowRight } from "lucide-react";
 import { useEffect } from "react";
 import { QuizTaker } from "#/components/quiz-taker";
-import { STEP_KIND_UI, StepView } from "#/components/step-kinds-ui";
+import { STEP_KIND_UI, StepView, takesSubmissions } from "#/components/step-kinds-ui";
+import { SubmissionSheet } from "#/components/submission-sheet";
 import { Button } from "#/components/ui/button";
 import type { StepKind } from "#/db/content-schema";
 import type { ClassId, StepId } from "#/db/ids";
@@ -85,6 +86,21 @@ export function StepReader({ userId, classId, step, modules, statusById }: StepR
 			({ step: s }) => s.id === step.id || isFinished(statusById.get(s.id)),
 		);
 		note = allDone ? "Semua langkah selesai." : "Ini langkah terakhir.";
+	}
+
+	// Handing work in is what finishes these, so they have no "Selesai" bar either.
+	if (takesSubmissions(step)) {
+		return (
+			<StepArticle kind={step.kind} title={step.title} dueAt={module?.dueAt ?? null}>
+				<SubmissionSheet
+					userId={userId}
+					classId={classId}
+					step={step}
+					dueAt={module?.dueAt ?? null}
+					nextStepId={next?.id}
+				/>
+			</StepArticle>
+		);
 	}
 
 	// A quiz is finished by passing it, not by the student saying so, so it has no "Selesai" bar.

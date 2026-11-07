@@ -2,15 +2,18 @@
 
 import { type } from "arktype";
 import type { StepKind, VisitEvent } from "#/db/content-schema";
+import type { SubmissionStatus } from "#/db/submission-schema";
 
-// Every status in docs/data-model.md. "graded" arrives with assignments.
+// Every status in docs/data-model.md.
 export type StepStatus = "not_started" | "in_progress" | "needs_help" | "done" | "graded";
 
-// What one student has done on one step. Later kinds add their work here, e.g. submissions.
+// What one student has done on one step.
 export type StepWork = {
 	visits: ReadonlySet<VisitEvent>;
 	// The score of each submitted quiz attempt, in percent. Empty for other kinds.
 	scores: readonly number[];
+	// The status of their assignment or reflection submission. Null when there is none.
+	submission: SubmissionStatus | null;
 };
 
 type StepKindSpec = {
@@ -59,9 +62,48 @@ function quizStatus(work: StepWork, content: QuizContent): StepStatus {
 	return "not_started";
 }
 
+// A grade's points are keyed by criterion id, so ids are unique within a rubric.
+const Criterion = type({
+	"+": "delete",
+	id: "1 <= string <= 64",
+	title: "1 <= string <= 200",
+	"description?": Markdown,
+	maxPoints: "1 <= number.integer <= 100",
+});
+const Rubric = Criterion.array()
+	.atLeastLength(1)
+	.atMostLength(20)
+	.narrow(
+		(criteria, ctx) =>
+			new Set(criteria.map((c) => c.id)).size === criteria.length || ctx.mustBe("unique ids"),
+	);
+export type Rubric = typeof Rubric.infer;
+
+const AssignmentContent = type({
+	"+": "delete",
+	prompt: Markdown,
+	accepts: type({ "+": "delete", text: "boolean", files: "boolean" }).narrow(
+		(a, ctx) => a.text || a.files || ctx.mustBe("accepting text, files, or both"),
+	),
+	"rubric?": Rubric,
+});
+
+const STATUS_OF_SUBMISSION = {
+	draft: "in_progress",
+	submitted: "done",
+	returned: "needs_help",
+	graded: "graded",
+} as const satisfies Record<SubmissionStatus, StepStatus>;
+
+// Shared by assignments and reflections. A reflection is never graded, so it never reaches "graded".
+function statusFromSubmission({ submission, visits }: StepWork): StepStatus {
+	if (submission) return STATUS_OF_SUBMISSION[submission];
+	return visits.size > 0 ? "in_progress" : "not_started";
+}
+
 // "+": "delete" drops keys the shape doesn't name, so nothing unchecked reaches the jsonb column.
 export const STEP_KINDS = {
-	// Images are markdown image links for now. Uploads come with assignments.
+	// Images are markdown image links.
 	reading: {
 		content: type({ "+": "delete", body: Markdown }),
 		finishedByStudent: true,
@@ -77,6 +119,18 @@ export const STEP_KINDS = {
 		content: QuizContent,
 		finishedByStudent: false,
 		status: quizStatus,
+	},
+	// The teacher grades it: with the rubric when there is one, otherwise a 0 to 100 score.
+	assignment: {
+		content: AssignmentContent,
+		finishedByStudent: false,
+		status: statusFromSubmission,
+	},
+	// Text only and never scored. A teacher can still return it with a comment.
+	reflection: {
+		content: type({ "+": "delete", prompt: Markdown }),
+		finishedByStudent: false,
+		status: statusFromSubmission,
 	},
 } as const satisfies Record<StepKind, StepKindSpec>;
 

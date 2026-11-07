@@ -6,6 +6,8 @@ const Env = type({
 	DATABASE_URL: "string.url",
 	BETTER_AUTH_SECRET: "string >= 32",
 	BETTER_AUTH_URL: "string.url",
+	// Where uploaded files live on disk. Relative paths start from the working directory.
+	UPLOAD_DIR: ["string > 0", "=", "./data/uploads"],
 });
 
 const parsed = Env(process.env);

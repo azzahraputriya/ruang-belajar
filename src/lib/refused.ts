@@ -6,6 +6,14 @@ export class Refused extends Error {
 	}
 }
 
+// The refusal reasons a server function can answer with, for typing a screen's message map.
+export type RefusalOf<F extends (...args: never[]) => unknown> =
+	Awaited<ReturnType<F>> extends infer R
+		? R extends { ok: false; reason: infer X }
+			? X
+			: never
+		: never;
+
 // `messages` is typed by the caller as Record<its reasons, string>, so a new reason fails to compile there.
 export function refusalMessage(
 	error: Error | null,

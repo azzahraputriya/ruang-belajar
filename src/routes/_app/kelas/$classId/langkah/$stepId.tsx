@@ -5,10 +5,12 @@ import { createFileRoute, getRouteApi, notFound } from "@tanstack/react-router";
 import { type } from "arktype";
 import { PaneMessage } from "#/components/pane-message";
 import { StepEditor } from "#/components/step-form";
+import { takesSubmissions } from "#/components/step-kinds-ui";
 import { StepReader } from "#/components/step-reader";
 import { ClassId, StepId } from "#/db/ids";
 import { modulesQuery, progressQuery, stepQuery } from "#/server/module-fns";
 import { quizQuery, teacherQuizQuery } from "#/server/quiz-fns";
+import { mySubmissionQuery } from "#/server/submission-fns";
 
 const classRoute = getRouteApi("/_app/kelas/$classId");
 
@@ -24,11 +26,15 @@ export const Route = createFileRoute("/_app/kelas/$classId/langkah/$stepId")({
 		]);
 		if (!modules.some((m) => m.id === step.moduleId)) throw notFound();
 		// A quiz's questions come from their own query: without keys for a student, with them for a teacher.
+		// A student's own submission does too.
+		const { loaderData } = await parentMatchPromise;
+		const role = loaderData?.cls.myRole;
 		if (step.kind === "quiz") {
-			const { loaderData } = await parentMatchPromise;
-			const role = loaderData?.cls.myRole;
 			if (role === "student") await queryClient.ensureQueryData(quizQuery(user.id, stepId));
 			if (role === "teacher") await queryClient.ensureQueryData(teacherQuizQuery(user.id, stepId));
+		}
+		if (takesSubmissions(step) && role === "student") {
+			await queryClient.ensureQueryData(mySubmissionQuery(user.id, stepId));
 		}
 		return { classId, stepId };
 	},

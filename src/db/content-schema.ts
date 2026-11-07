@@ -6,7 +6,13 @@ import { classTable } from "#/db/class-schema";
 import type { ClassId, ModuleId, StepId, UserId } from "#/db/ids";
 
 // Adding a kind is one value here (a migration) plus its entry in src/server/step-kinds.ts, which won't compile without it.
-export const stepKind = pgEnum("step_kind", ["reading", "embed", "quiz"]);
+export const stepKind = pgEnum("step_kind", [
+	"reading",
+	"embed",
+	"quiz",
+	"assignment",
+	"reflection",
+]);
 export type StepKind = (typeof stepKind.enumValues)[number];
 
 export const visitEvent = pgEnum("visit_event", ["opened", "finished"]);

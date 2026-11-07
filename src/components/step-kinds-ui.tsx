@@ -1,11 +1,22 @@
 // Owns: how each step kind looks on screen, meaning its label, icon, student view, editor fields, empty content, and client checks, plus the markdown renderer they share. Not here: each kind's stored shape and status rule (src/server/step-kinds.ts).
 
-import { BookOpen, ExternalLink, ListChecks, PlayCircle, type LucideIcon } from "lucide-react";
+import {
+	BookOpen,
+	ExternalLink,
+	FileText,
+	ListChecks,
+	NotebookPen,
+	PlayCircle,
+	type LucideIcon,
+} from "lucide-react";
 import ReactMarkdown from "react-markdown";
+import { AssignmentFields, checkAssignment } from "#/components/assignment-fields";
 import { TextareaField, FormField } from "#/components/form-field";
+import { RubricLine } from "#/components/submission-parts";
 import { Input } from "#/components/ui/input";
 import type { StepKind } from "#/db/content-schema";
 import { embedSrc } from "#/lib/embed-src";
+import { MARKDOWN_HINT, MARKDOWN_MAX } from "#/lib/markdown-field";
 import type { STEP_KINDS } from "#/server/step-kinds";
 
 type ContentMap = { [K in StepKind]: (typeof STEP_KINDS)[K]["content"]["infer"] };
@@ -28,9 +39,6 @@ type KindUi<K extends StepKind> = {
 	check: (content: ContentOf<K>) => FieldErrors;
 };
 
-// Same cap as the server's Markdown type.
-const MARKDOWN_MAX = 100_000;
-const MARKDOWN_HINT = "Markdown. Gambar pakai tautan ![keterangan](https://…).";
 const MONO = "min-h-80 font-mono text-[13px] leading-6";
 
 // react-markdown's defaults drop raw HTML and unsafe link schemes such as javascript:.
@@ -51,6 +59,14 @@ function isHttps(raw: string) {
 		return false;
 	}
 }
+
+// Keyed by "text-files". Both off never saves, but Pratinjau can show it mid-edit.
+const ACCEPTS_LABEL: Record<`${boolean}-${boolean}`, string> = {
+	"true-true": "teks dan berkas",
+	"true-false": "teks",
+	"false-true": "berkas",
+	"false-false": "belum dipilih",
+};
 
 type QuizSettings = ContentOf<"quiz">;
 const SETTINGS_LIMITS = { maxAttempts: [1, 10], passScore: [0, 100] } as const;
@@ -232,6 +248,48 @@ export const STEP_KIND_UI: { [K in StepKind]: KindUi<K> } = {
 		),
 		check: checkQuizSettings,
 	},
+	// The student's screen is its own (src/components/submission-sheet.tsx). View here is the
+	// teacher's Pratinjau and the new-step form.
+	assignment: {
+		label: "Tugas",
+		Icon: FileText,
+		empty: { prompt: "", accepts: { text: true, files: true } },
+		View: ({ content }) => (
+			<>
+				<Markdown>{content.prompt}</Markdown>
+				<RubricLine rubric={content.rubric} />
+				<p className="mt-2 text-xs text-muted-foreground">
+					Siswa mengumpulkan {ACCEPTS_LABEL[`${content.accepts.text}-${content.accepts.files}`]}.
+				</p>
+			</>
+		),
+		Fields: AssignmentFields,
+		check: checkAssignment,
+	},
+	reflection: {
+		label: "Refleksi",
+		Icon: NotebookPen,
+		empty: { prompt: "" },
+		View: ({ content }) => (
+			<>
+				<p className="-mt-4 mb-6 text-sm text-muted-foreground">Tidak dinilai.</p>
+				<Markdown>{content.prompt}</Markdown>
+			</>
+		),
+		Fields: ({ value, onChange, errors }) => (
+			<TextareaField
+				id="prompt"
+				label="Pertanyaan"
+				hint={`${MARKDOWN_HINT} Siswa menjawab dengan teks, tidak dinilai.`}
+				error={errors.prompt}
+				className="min-h-40 font-mono text-[13px] leading-6"
+				maxLength={MARKDOWN_MAX}
+				value={value.prompt}
+				onChange={(e) => onChange({ prompt: e.target.value })}
+			/>
+		),
+		check: () => ({}),
+	},
 };
 
 export function KindIcon({ kind, className = "size-4" }: { kind: StepKind; className?: string }) {
@@ -265,6 +323,13 @@ export const checkStepContent = <K extends StepKind>(kind: K, content: ContentOf
 // Parses the `jenis` search param without pulling the server's enum into the browser bundle.
 export const isStepKind = (value: unknown): value is StepKind =>
 	typeof value === "string" && Object.hasOwn(STEP_KIND_UI, value);
+
+// Assignments and reflections: the kinds a student hands work in on. Mirrors the server's acceptsOf.
+// Takes the whole step, so the check narrows the step and its content together.
+export const takesSubmissions = <S extends { kind: StepKind }>(
+	step: S,
+): step is Extract<S, { kind: "assignment" | "reflection" }> =>
+	step.kind === "assignment" || step.kind === "reflection";
 
 // Every kind, in the registry's order, for the "+ Langkah" choice.
 export const STEP_KIND_LIST = Object.keys(STEP_KIND_UI).filter(isStepKind);

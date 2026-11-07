@@ -6,17 +6,17 @@ This file is the roadmap. To pick up work, take the first phase that is `in prog
 
 ## Status
 
-| Phase                           | Status      | PRs                       |
-| ------------------------------- | ----------- | ------------------------- |
-| 0. Repo setup                   | done        | #1 to #5, release #6      |
-| 1. Accounts                     | done        | #7, #11, #15, release #16 |
-| 2. Deploy                       | done        | #8, #14, release #20      |
-| 3. Classes and invites          | done        | #9, #18, #23, release #21 |
-| 4. Content: modules and steps   | done        | #10, #22, release #25     |
-| 5. Quizzes                      | done        | #12, #27, release #28     |
-| 6. Assignments and grading      | in progress | #13                       |
-| 7. Discussion and announcements | in progress | #17                       |
-| 8. AI tutor                     | not started |                           |
+| Phase                           | Status      | PRs                        |
+| ------------------------------- | ----------- | -------------------------- |
+| 0. Repo setup                   | done        | #1 to #5, release #6       |
+| 1. Accounts                     | done        | #7, #11, #15, release #16  |
+| 2. Deploy                       | done        | #8, #14, release #20       |
+| 3. Classes and invites          | done        | #9, #18, #23, release #21  |
+| 4. Content: modules and steps   | done        | #10, #22, release #25      |
+| 5. Quizzes                      | done        | #12, #27, release #28      |
+| 6. Assignments and grading      | in review   | #13, #30, #31, release #32 |
+| 7. Discussion and announcements | in progress | #17                        |
+| 8. AI tutor                     | not started |                            |
 
 Phases 1 to 8 each end in a working, tested slice. Phase 2 can run alongside phase 3.
 
@@ -118,6 +118,7 @@ Settled by Afief, with the reason where it isn't obvious:
 - **Consent.** The tutor sends student work to an outside AI service, which counts as personal data under UU PDP (Law No. 27/2022). Afief approves the consent text and its stated purpose.
 - **Members screen.** Mock B, a side panel opened from "Anggota" in the class header (Afief, 07 November 2026).
 - **Quiz screens.** Mock B, one question at a time with numbered buttons, a result list with each answer, and a question list beside one editor for teachers (Afief, 07 November 2026).
+- **Assignment screens.** Mock A for students, one sheet with the prompt, answer, files, and the teacher's comment above the answer. Mock B's class-wide "Perlu dinilai" queue for teachers (Afief, 07 November 2026).
 
 ## Open decisions
 
