@@ -8,3 +8,4 @@ mocks
 .nitro
 .tanstack
 dist
+data

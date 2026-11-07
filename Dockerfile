@@ -15,6 +15,8 @@ WORKDIR /app
 ENV NODE_ENV=production HOST=0.0.0.0 PORT=3000
 COPY --from=build /app/.output ./.output
 COPY drizzle ./drizzle
+# The uploads volume mounts here. A new empty volume copies this folder's owner, so node can write to it.
+RUN mkdir -p /app/data/uploads && chown -R node:node /app/data
 USER node
 EXPOSE 3000
 CMD ["sh", "-c", "node .output/migrate/migrate.mjs && exec node .output/server/index.mjs"]

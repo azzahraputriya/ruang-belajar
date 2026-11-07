@@ -12,6 +12,9 @@ services:
     # Localhost only. The Cloudflare Tunnel is the only way in from outside.
     ports:
       - "127.0.0.1:3300:3000"
+    # Same path as UPLOAD_DIR in .env.production.
+    volumes:
+      - uploads:/app/data/uploads
     depends_on:
       db:
         condition: service_healthy
@@ -35,3 +38,4 @@ services:
 
 volumes:
   db-data:
+  uploads:

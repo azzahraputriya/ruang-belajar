@@ -13,6 +13,16 @@ All accounts and class data live in the Docker volume `ruang-belajar-prod_db-dat
 
 There are no backups. This is an accepted risk: if the disk or that volume is lost, all data is lost. Never run `docker compose down -v` or `docker volume rm` on it.
 
+## Uploads
+
+Files students hand in live in the Docker volume `ruang-belajar-prod_uploads`, mounted at `/app/data/uploads` (`UPLOAD_DIR`). Like the database, rebuilds and restarts keep it, and it has no backups.
+
+Uploads are the only data that grows without limit, and the VPS disk is about 90% full. Each file is at most 10 MB, with at most 5 per submission. Check the volume's size now and then, and move uploads to object storage before the disk runs short:
+
+```bash
+docker system df -v | grep uploads
+```
+
 ## First deploy
 
 ```bash
