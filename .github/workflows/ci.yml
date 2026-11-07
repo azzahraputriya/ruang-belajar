@@ -85,3 +85,25 @@ jobs:
       - run: pnpm install --frozen-lockfile
       # Vitest's global setup applies the migrations.
       - run: pnpm test
+
+  # Boots the real production stack on an empty volume, so the image, the first-start migration, and the healthcheck are all exercised.
+  image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Throwaway production env
+        run: |
+          pw=$(openssl rand -hex 24)
+          {
+            echo "POSTGRES_PASSWORD=$pw"
+            echo "DATABASE_URL=postgres://ruang:$pw@db:5432/ruang"
+            echo "BETTER_AUTH_SECRET=$(openssl rand -base64 32)"
+            echo "BETTER_AUTH_URL=http://localhost:3300"
+          } > .env.production
+      - run: docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build --wait
+      - name: App answers, and the migration made the user table
+        run: |
+          curl -fsS http://127.0.0.1:3300/api/auth/get-session
+          docker compose -f docker-compose.prod.yml --env-file .env.production exec -T db psql -U ruang -d ruang -tAc 'select count(*) from "user"'
+      - if: failure()
+        run: docker compose -f docker-compose.prod.yml --env-file .env.production logs

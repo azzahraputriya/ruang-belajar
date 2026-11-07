@@ -14,9 +14,16 @@ import { Route as AuthRouteImport } from './routes/_auth'
 import { Route as AppIndexRouteImport } from './routes/_app/index'
 import { Route as AuthDaftarRouteImport } from './routes/_auth/daftar'
 import { Route as AuthMasukRouteImport } from './routes/_auth/masuk'
+import { Route as AppKelasClassIdRouteImport } from './routes/_app/kelas/$classId'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as ApiFilesFileIdRouteImport } from './routes/api/files/$fileId'
+import { Route as AppKelasClassIdIndexRouteImport } from './routes/_app/kelas/$classId/index'
+import { Route as AppKelasClassIdLangkahBaruRouteImport } from './routes/_app/kelas/$classId/langkah-baru'
+import { Route as AppKelasClassIdModulBaruRouteImport } from './routes/_app/kelas/$classId/modul-baru'
+import { Route as AppKelasClassIdNilaiRouteImport } from './routes/_app/kelas/$classId/nilai'
 import { Route as ApiFilesUploadStepIdRouteImport } from './routes/api/files/upload/$stepId'
+import { Route as AppKelasClassIdLangkahStepIdRouteImport } from './routes/_app/kelas/$classId/langkah/$stepId'
+import { Route as AppKelasClassIdModulModuleIdRouteImport } from './routes/_app/kelas/$classId/modul/$moduleId'
 
 const AppRoute = AppRouteImport.update({
   id: '/_app',
@@ -41,6 +48,11 @@ const AuthMasukRoute = AuthMasukRouteImport.update({
   path: '/masuk',
   getParentRoute: () => AuthRoute,
 } as any)
+const AppKelasClassIdRoute = AppKelasClassIdRouteImport.update({
+  id: '/kelas/$classId',
+  path: '/kelas/$classId',
+  getParentRoute: () => AppRoute,
+} as any)
 const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   id: '/api/auth/$',
   path: '/api/auth/$',
@@ -51,19 +63,60 @@ const ApiFilesFileIdRoute = ApiFilesFileIdRouteImport.update({
   path: '/api/files/$fileId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AppKelasClassIdIndexRoute = AppKelasClassIdIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AppKelasClassIdRoute,
+} as any)
+const AppKelasClassIdLangkahBaruRoute =
+  AppKelasClassIdLangkahBaruRouteImport.update({
+    id: '/langkah-baru',
+    path: '/langkah-baru',
+    getParentRoute: () => AppKelasClassIdRoute,
+  } as any)
+const AppKelasClassIdModulBaruRoute =
+  AppKelasClassIdModulBaruRouteImport.update({
+    id: '/modul-baru',
+    path: '/modul-baru',
+    getParentRoute: () => AppKelasClassIdRoute,
+  } as any)
+const AppKelasClassIdNilaiRoute = AppKelasClassIdNilaiRouteImport.update({
+  id: '/nilai',
+  path: '/nilai',
+  getParentRoute: () => AppKelasClassIdRoute,
+} as any)
 const ApiFilesUploadStepIdRoute = ApiFilesUploadStepIdRouteImport.update({
   id: '/api/files/upload/$stepId',
   path: '/api/files/upload/$stepId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AppKelasClassIdLangkahStepIdRoute =
+  AppKelasClassIdLangkahStepIdRouteImport.update({
+    id: '/langkah/$stepId',
+    path: '/langkah/$stepId',
+    getParentRoute: () => AppKelasClassIdRoute,
+  } as any)
+const AppKelasClassIdModulModuleIdRoute =
+  AppKelasClassIdModulModuleIdRouteImport.update({
+    id: '/modul/$moduleId',
+    path: '/modul/$moduleId',
+    getParentRoute: () => AppKelasClassIdRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
   '/daftar': typeof AuthDaftarRoute
   '/masuk': typeof AuthMasukRoute
+  '/kelas/$classId': typeof AppKelasClassIdRouteWithChildren
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/files/$fileId': typeof ApiFilesFileIdRoute
+  '/kelas/$classId/langkah-baru': typeof AppKelasClassIdLangkahBaruRoute
+  '/kelas/$classId/modul-baru': typeof AppKelasClassIdModulBaruRoute
+  '/kelas/$classId/nilai': typeof AppKelasClassIdNilaiRoute
   '/api/files/upload/$stepId': typeof ApiFilesUploadStepIdRoute
+  '/kelas/$classId/': typeof AppKelasClassIdIndexRoute
+  '/kelas/$classId/langkah/$stepId': typeof AppKelasClassIdLangkahStepIdRoute
+  '/kelas/$classId/modul/$moduleId': typeof AppKelasClassIdModulModuleIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof AppIndexRoute
@@ -71,7 +124,13 @@ export interface FileRoutesByTo {
   '/masuk': typeof AuthMasukRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/files/$fileId': typeof ApiFilesFileIdRoute
+  '/kelas/$classId/langkah-baru': typeof AppKelasClassIdLangkahBaruRoute
+  '/kelas/$classId/modul-baru': typeof AppKelasClassIdModulBaruRoute
+  '/kelas/$classId/nilai': typeof AppKelasClassIdNilaiRoute
   '/api/files/upload/$stepId': typeof ApiFilesUploadStepIdRoute
+  '/kelas/$classId': typeof AppKelasClassIdIndexRoute
+  '/kelas/$classId/langkah/$stepId': typeof AppKelasClassIdLangkahStepIdRoute
+  '/kelas/$classId/modul/$moduleId': typeof AppKelasClassIdModulModuleIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -80,9 +139,16 @@ export interface FileRoutesById {
   '/_auth/daftar': typeof AuthDaftarRoute
   '/_auth/masuk': typeof AuthMasukRoute
   '/_app/': typeof AppIndexRoute
+  '/_app/kelas/$classId': typeof AppKelasClassIdRouteWithChildren
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/files/$fileId': typeof ApiFilesFileIdRoute
+  '/_app/kelas/$classId/langkah-baru': typeof AppKelasClassIdLangkahBaruRoute
+  '/_app/kelas/$classId/modul-baru': typeof AppKelasClassIdModulBaruRoute
+  '/_app/kelas/$classId/nilai': typeof AppKelasClassIdNilaiRoute
   '/api/files/upload/$stepId': typeof ApiFilesUploadStepIdRoute
+  '/_app/kelas/$classId/': typeof AppKelasClassIdIndexRoute
+  '/_app/kelas/$classId/langkah/$stepId': typeof AppKelasClassIdLangkahStepIdRoute
+  '/_app/kelas/$classId/modul/$moduleId': typeof AppKelasClassIdModulModuleIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -90,9 +156,16 @@ export interface FileRouteTypes {
     | '/'
     | '/daftar'
     | '/masuk'
+    | '/kelas/$classId'
     | '/api/auth/$'
     | '/api/files/$fileId'
+    | '/kelas/$classId/langkah-baru'
+    | '/kelas/$classId/modul-baru'
+    | '/kelas/$classId/nilai'
     | '/api/files/upload/$stepId'
+    | '/kelas/$classId/'
+    | '/kelas/$classId/langkah/$stepId'
+    | '/kelas/$classId/modul/$moduleId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -100,7 +173,13 @@ export interface FileRouteTypes {
     | '/masuk'
     | '/api/auth/$'
     | '/api/files/$fileId'
+    | '/kelas/$classId/langkah-baru'
+    | '/kelas/$classId/modul-baru'
+    | '/kelas/$classId/nilai'
     | '/api/files/upload/$stepId'
+    | '/kelas/$classId'
+    | '/kelas/$classId/langkah/$stepId'
+    | '/kelas/$classId/modul/$moduleId'
   id:
     | '__root__'
     | '/_app'
@@ -108,9 +187,16 @@ export interface FileRouteTypes {
     | '/_auth/daftar'
     | '/_auth/masuk'
     | '/_app/'
+    | '/_app/kelas/$classId'
     | '/api/auth/$'
     | '/api/files/$fileId'
+    | '/_app/kelas/$classId/langkah-baru'
+    | '/_app/kelas/$classId/modul-baru'
+    | '/_app/kelas/$classId/nilai'
     | '/api/files/upload/$stepId'
+    | '/_app/kelas/$classId/'
+    | '/_app/kelas/$classId/langkah/$stepId'
+    | '/_app/kelas/$classId/modul/$moduleId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -158,6 +244,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthMasukRouteImport
       parentRoute: typeof AuthRoute
     }
+    '/_app/kelas/$classId': {
+      id: '/_app/kelas/$classId'
+      path: '/kelas/$classId'
+      fullPath: '/kelas/$classId'
+      preLoaderRoute: typeof AppKelasClassIdRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/api/auth/$': {
       id: '/api/auth/$'
       path: '/api/auth/$'
@@ -172,6 +265,34 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiFilesFileIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_app/kelas/$classId/': {
+      id: '/_app/kelas/$classId/'
+      path: '/'
+      fullPath: '/kelas/$classId/'
+      preLoaderRoute: typeof AppKelasClassIdIndexRouteImport
+      parentRoute: typeof AppKelasClassIdRoute
+    }
+    '/_app/kelas/$classId/langkah-baru': {
+      id: '/_app/kelas/$classId/langkah-baru'
+      path: '/langkah-baru'
+      fullPath: '/kelas/$classId/langkah-baru'
+      preLoaderRoute: typeof AppKelasClassIdLangkahBaruRouteImport
+      parentRoute: typeof AppKelasClassIdRoute
+    }
+    '/_app/kelas/$classId/modul-baru': {
+      id: '/_app/kelas/$classId/modul-baru'
+      path: '/modul-baru'
+      fullPath: '/kelas/$classId/modul-baru'
+      preLoaderRoute: typeof AppKelasClassIdModulBaruRouteImport
+      parentRoute: typeof AppKelasClassIdRoute
+    }
+    '/_app/kelas/$classId/nilai': {
+      id: '/_app/kelas/$classId/nilai'
+      path: '/nilai'
+      fullPath: '/kelas/$classId/nilai'
+      preLoaderRoute: typeof AppKelasClassIdNilaiRouteImport
+      parentRoute: typeof AppKelasClassIdRoute
+    }
     '/api/files/upload/$stepId': {
       id: '/api/files/upload/$stepId'
       path: '/api/files/upload/$stepId'
@@ -179,15 +300,53 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiFilesUploadStepIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_app/kelas/$classId/langkah/$stepId': {
+      id: '/_app/kelas/$classId/langkah/$stepId'
+      path: '/langkah/$stepId'
+      fullPath: '/kelas/$classId/langkah/$stepId'
+      preLoaderRoute: typeof AppKelasClassIdLangkahStepIdRouteImport
+      parentRoute: typeof AppKelasClassIdRoute
+    }
+    '/_app/kelas/$classId/modul/$moduleId': {
+      id: '/_app/kelas/$classId/modul/$moduleId'
+      path: '/modul/$moduleId'
+      fullPath: '/kelas/$classId/modul/$moduleId'
+      preLoaderRoute: typeof AppKelasClassIdModulModuleIdRouteImport
+      parentRoute: typeof AppKelasClassIdRoute
+    }
   }
 }
 
+interface AppKelasClassIdRouteChildren {
+  AppKelasClassIdLangkahBaruRoute: typeof AppKelasClassIdLangkahBaruRoute
+  AppKelasClassIdModulBaruRoute: typeof AppKelasClassIdModulBaruRoute
+  AppKelasClassIdNilaiRoute: typeof AppKelasClassIdNilaiRoute
+  AppKelasClassIdIndexRoute: typeof AppKelasClassIdIndexRoute
+  AppKelasClassIdLangkahStepIdRoute: typeof AppKelasClassIdLangkahStepIdRoute
+  AppKelasClassIdModulModuleIdRoute: typeof AppKelasClassIdModulModuleIdRoute
+}
+
+const AppKelasClassIdRouteChildren: AppKelasClassIdRouteChildren = {
+  AppKelasClassIdLangkahBaruRoute: AppKelasClassIdLangkahBaruRoute,
+  AppKelasClassIdModulBaruRoute: AppKelasClassIdModulBaruRoute,
+  AppKelasClassIdNilaiRoute: AppKelasClassIdNilaiRoute,
+  AppKelasClassIdIndexRoute: AppKelasClassIdIndexRoute,
+  AppKelasClassIdLangkahStepIdRoute: AppKelasClassIdLangkahStepIdRoute,
+  AppKelasClassIdModulModuleIdRoute: AppKelasClassIdModulModuleIdRoute,
+}
+
+const AppKelasClassIdRouteWithChildren = AppKelasClassIdRoute._addFileChildren(
+  AppKelasClassIdRouteChildren,
+)
+
 interface AppRouteChildren {
   AppIndexRoute: typeof AppIndexRoute
+  AppKelasClassIdRoute: typeof AppKelasClassIdRouteWithChildren
 }
 
 const AppRouteChildren: AppRouteChildren = {
   AppIndexRoute: AppIndexRoute,
+  AppKelasClassIdRoute: AppKelasClassIdRouteWithChildren,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)

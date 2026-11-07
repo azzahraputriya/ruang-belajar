@@ -254,19 +254,41 @@ export async function quizAttempts(actor: UserId, stepId: StepId) {
 	} as const;
 }
 
-const attemptsOf = (conn: Conn, stepId: StepId, studentId: UserId) =>
-	conn
+// Whether each question was right, keyed by question id, as graded at submit time.
+const StoredResults = type("Record<string, boolean>");
+
+const scoresOf = async (conn: Conn, stepId: StepId, studentId: UserId) =>
+	(
+		await conn
+			.select({ score: quizAttempt.score })
+			.from(quizAttempt)
+			.where(and(eq(quizAttempt.stepId, stepId), eq(quizAttempt.studentId, studentId)))
+	).map((a) => a.score);
+
+// One student's own attempts, in order, with their answers and which questions they got right.
+// None of it comes from question_key, so it is safe to send before a pass.
+async function attemptsOf(conn: Conn, stepId: StepId, studentId: UserId) {
+	const rows = await conn
 		.select({
 			attemptNumber: quizAttempt.attemptNumber,
 			score: quizAttempt.score,
 			submittedAt: quizAttempt.submittedAt,
+			answers: quizAttempt.answers,
+			results: quizAttempt.results,
 		})
 		.from(quizAttempt)
 		.where(and(eq(quizAttempt.stepId, stepId), eq(quizAttempt.studentId, studentId)))
 		.orderBy(asc(quizAttempt.attemptNumber));
+	return rows.map((a) =>
+		Object.assign(a, {
+			answers: StoredAnswers.assert(a.answers),
+			results: StoredResults.assert(a.results),
+		}),
+	);
+}
 
-// The quiz as the acting student sees it: questions without keys, their own attempts, and the
-// solutions only after they pass. Teachers use teacherQuiz instead.
+// The quiz as the acting student sees it: questions without keys, their own attempts with their
+// answers and per-question results, and the solutions only after they pass. Teachers use teacherQuiz instead.
 export async function getQuiz(actor: UserId, stepId: StepId) {
 	const access = await readQuiz(db, actor, stepId);
 	if (!access) return NOT_FOUND;
@@ -311,7 +333,7 @@ export async function submitAttempt(actor: UserId, stepId: StepId, answers: Answ
 		if (access.parsed.kind !== "quiz") return fail("not_a_quiz");
 		const settings = access.parsed.content;
 
-		const scores = (await attemptsOf(tx, stepId, actor)).map((a) => a.score);
+		const scores = await scoresOf(tx, stepId, actor);
 		const before = quizProgress(settings, scores);
 		if (before.passed) return fail("already_passed");
 		if (before.attemptsLeft === 0) return fail("no_attempts_left");
@@ -344,9 +366,14 @@ export async function submitAttempt(actor: UserId, stepId: StepId, answers: Answ
 		}
 		const score = Math.floor((results.filter((r) => r.correct).length * 100) / rows.length);
 		const attemptNumber = scores.length + 1;
-		await tx
-			.insert(quizAttempt)
-			.values({ stepId, studentId: actor, attemptNumber, answers: stored, score });
+		await tx.insert(quizAttempt).values({
+			stepId,
+			studentId: actor,
+			attemptNumber,
+			answers: stored,
+			results: Object.fromEntries(results.map((r) => [r.questionId, r.correct])),
+			score,
+		});
 
 		const after = quizProgress(settings, [...scores, score]);
 		return {

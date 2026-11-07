@@ -87,6 +87,25 @@ export async function listMembers(actor: UserId, classId: ClassId) {
 	return { ok: true, members } as const;
 }
 
+// Teachers only: who was invited but hasn't answered. The invitee is joined for their username.
+export async function listClassInvites(actor: UserId, classId: ClassId) {
+	const role = await roleIn(db, classId, actor);
+	if (!role) return NOT_FOUND;
+	if (role !== "teacher") return fail("forbidden");
+	const invites = await db
+		.select({
+			id: classInvite.id,
+			username: user.username,
+			role: classInvite.role,
+			createdAt: classInvite.createdAt,
+		})
+		.from(classInvite)
+		.innerJoin(user, eq(user.id, classInvite.inviteeId))
+		.where(and(eq(classInvite.classId, classId), eq(classInvite.status, "pending")))
+		.orderBy(desc(classInvite.createdAt));
+	return { ok: true, invites } as const;
+}
+
 // Locked like changeMember, so a teacher who is being demoted can't send one last invite.
 export async function invite(actor: UserId, classId: ClassId, input: InviteInput) {
 	return db.transaction(async (tx) => {
