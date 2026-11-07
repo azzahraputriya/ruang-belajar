@@ -18,6 +18,7 @@ import {
 	getClass,
 	invite,
 	leaveClass,
+	listClassInvites,
 	listMembers,
 	listMyClasses,
 	listMyPendingInvites,
@@ -26,7 +27,7 @@ import {
 } from "#/server/classes";
 
 // Screens that call these sit behind sign-in, so a missing session is a bug, not an expected result.
-// Server-only: module-fns.ts imports it, and the browser bundle loads that file for its queries.
+// Server-only, so a browser bundle that imports this file never pulls in the session code.
 export const requireActor = createServerOnlyFn(async () => {
 	const session = await auth.api.getSession({ headers: getRequest().headers });
 	if (!session) throw new Error("Not signed in");
@@ -56,6 +57,10 @@ export const getClassFn = createServerFn()
 export const listMembersFn = createServerFn()
 	.validator(InClass)
 	.handler(async ({ data }) => listMembers(await requireActor(), data.classId));
+
+export const listClassInvitesFn = createServerFn()
+	.validator(InClass)
+	.handler(async ({ data }) => listClassInvites(await requireActor(), data.classId));
 
 export const inviteFn = createServerFn({ method: "POST" })
 	.validator(InviteInput.merge({ classId: ClassId }))
@@ -114,7 +119,7 @@ export const setLastClassFn = createServerFn({ method: "POST" })
 	});
 
 // Keyed by user, so whoever signs in next in this tab never sees the last user's cached classes.
-// Invalidate with the bare ["classes"] or ["invites"] prefix.
+// Invalidate with the bare prefix: ["classes"], ["invites"], ["members"], or ["class-invites"].
 export const myClassesQuery = (userId: string) =>
 	queryOptions({
 		queryKey: ["classes", userId],
@@ -125,4 +130,18 @@ export const myInvitesQuery = (userId: string) =>
 	queryOptions({
 		queryKey: ["invites", userId],
 		queryFn: () => listMyPendingInvitesFn(),
+	});
+
+export const membersQuery = (userId: string, classId: ClassId) =>
+	queryOptions({
+		queryKey: ["members", userId, classId],
+		queryFn: () => listMembersFn({ data: { classId } }),
+	});
+
+// Students get "forbidden" from the server, so screens enable this for teachers only.
+export const classInvitesQuery = (userId: string, classId: ClassId, enabled: boolean) =>
+	queryOptions({
+		queryKey: ["class-invites", userId, classId],
+		queryFn: () => listClassInvitesFn({ data: { classId } }),
+		enabled,
 	});

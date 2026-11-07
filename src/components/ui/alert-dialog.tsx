@@ -1,5 +1,7 @@
 // Owns: shadcn/ui alert-dialog, as generated. Not here: app-specific changes (wrap it in src/components/).
 
+"use client";
+
 import * as React from "react";
 import { cn } from "#/lib/utils";
 import { AlertDialog as AlertDialogPrimitive } from "radix-ui";

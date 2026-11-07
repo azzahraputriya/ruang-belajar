@@ -5,23 +5,29 @@ import { createFileRoute, Link, notFound, Outlet } from "@tanstack/react-router"
 import { type } from "arktype";
 import { useEffect } from "react";
 import { InviteBanner } from "#/components/invite-banner";
+import { MembersPanel } from "#/components/members-panel";
 import { SyllabusAside, SyllabusBar, type SyllabusProps } from "#/components/syllabus";
 import { ClassId } from "#/db/ids";
 import { ROLE_LABEL } from "#/lib/class-labels";
-import { getClassFn, listMembersFn, setLastClassFn } from "#/server/class-fns";
+import { getClassFn, membersQuery, setLastClassFn } from "#/server/class-fns";
 import { modulesQuery, progressQuery } from "#/server/module-fns";
 
 export const Route = createFileRoute("/_app/kelas/$classId")({
-	// Every step click is a child navigation, which would rerun this loader. The class title and
-	// member count rarely change, so a minute old is fine. Modules and progress have their own queries.
+	// Every step click is a child navigation, which would rerun this loader. The class title and your
+	// role rarely change, so a minute old is fine. The member count, modules, and progress have their
+	// own queries, and the members panel reloads this route itself when your role changes.
 	staleTime: 60_000,
 	// A malformed id and a class you aren't in end the same way, so non-members learn nothing.
+	// The member list goes through the same query as the members panel, so the header's count
+	// refreshes whenever that query does: when the panel opens, after a change, and when you come
+	// back to the tab after someone else joined or left.
 	loader: async ({ params, context: { queryClient, user } }) => {
 		const classId = ClassId(params.classId);
 		if (classId instanceof type.errors) throw notFound();
 		const [found, members] = await Promise.all([
 			getClassFn({ data: { classId } }),
-			listMembersFn({ data: { classId } }),
+			// fetchQuery, not ensureQueryData: a cached "not found" from before you (re)joined would block the page.
+			queryClient.fetchQuery(membersQuery(user.id, classId)),
 		]);
 		if (!found.ok || !members.ok) throw notFound();
 		// Membership is settled above, so these only fail if the class changes in between.
@@ -31,7 +37,7 @@ export const Route = createFileRoute("/_app/kelas/$classId")({
 				? queryClient.ensureQueryData(progressQuery(user.id, classId))
 				: undefined,
 		]);
-		return { cls: found.class, memberCount: members.members.length };
+		return { cls: found.class };
 	},
 	head: ({ loaderData }) => ({
 		meta: [{ title: loaderData ? `${loaderData.cls.title} · Ruang Belajar` : "Ruang Belajar" }],
@@ -41,9 +47,10 @@ export const Route = createFileRoute("/_app/kelas/$classId")({
 });
 
 function ClassPage() {
-	const { cls, memberCount } = Route.useLoaderData();
+	const { cls } = Route.useLoaderData();
 	const { user } = Route.useRouteContext();
 	const student = cls.myRole === "student";
+	const { data: members } = useSuspenseQuery(membersQuery(user.id, cls.id));
 	const { data: modules } = useSuspenseQuery(modulesQuery(user.id, cls.id));
 	const { data: statusById } = useQuery({ ...progressQuery(user.id, cls.id), enabled: student });
 
@@ -62,8 +69,10 @@ function ClassPage() {
 					{cls.title}
 				</h1>
 				<span className="shrink-0 text-sm text-muted-foreground">
-					{ROLE_LABEL[cls.myRole]} · {memberCount} anggota
+					{ROLE_LABEL[cls.myRole]}
+					{members.ok ? ` · ${members.members.length} anggota` : null}
 				</span>
+				<MembersPanel cls={cls} />
 			</header>
 			<InviteBanner />
 			<div className="flex flex-1">
