@@ -166,17 +166,18 @@ function PanelBody({ classId, isTeacher }: { classId: ClassId; isTeacher: boolea
 	const focusListAfterClose = useRef(false);
 
 	// Also runs after a refusal, since one usually means someone else changed the class meanwhile.
-	// The router reload updates the header's count and my role, which picks the teacher or student view.
-	const refresh = (header: boolean) =>
+	// The members query also feeds the header's count. The router reload refreshes my role, which
+	// picks the teacher or student view.
+	const refresh = (reloadRole: boolean) =>
 		Promise.all([
 			queryClient.invalidateQueries({ queryKey: membersQuery(user.id, classId).queryKey }),
 			queryClient.invalidateQueries({
 				queryKey: classInvitesQuery(user.id, classId, isTeacher).queryKey,
 			}),
-			header && router.invalidate(),
+			reloadRole && router.invalidate(),
 		]);
 	// A refusal like "forbidden" or "not_found" means my role or membership changed elsewhere, so it
-	// reloads the header and role too. Other refusals leave them as they are.
+	// reloads my role too. Other refusals leave it as it is.
 	const refreshAfter = (error: Error) =>
 		refresh(
 			error instanceof Refused && (error.reason === "forbidden" || error.reason === "not_found"),
