@@ -2,8 +2,8 @@
 
 import { createFileRoute, notFound } from "@tanstack/react-router";
 import { type } from "arktype";
-import { useSuspenseQuery } from "@tanstack/react-query";
-import { ModuleEditor } from "#/components/module-form";
+import { useIsMutating, useSuspenseQuery } from "@tanstack/react-query";
+import { ModuleEditor, deletingModuleKey } from "#/components/module-form";
 import { PaneMessage } from "#/components/pane-message";
 import { ClassId, ModuleId } from "#/db/ids";
 import { modulesQuery } from "#/server/module-fns";
@@ -33,8 +33,10 @@ function ModulePane() {
 	const { classId, moduleId } = Route.useLoaderData();
 	const { user } = Route.useRouteContext();
 	const { data: modules } = useSuspenseQuery(modulesQuery(user.id, classId));
+	const deleting = useIsMutating({ mutationKey: deletingModuleKey(moduleId) }) > 0;
 	const module = modules.find((m) => m.id === moduleId);
-	// Gone after a refetch, e.g. deleted in another tab. Background refetches don't throw, so say it here.
-	if (!module) return <PaneMessage title="Modul tidak ditemukan." />;
+	// Gone after a refetch. While this pane's own delete is leaving for the class index, show nothing.
+	// Otherwise it went elsewhere (another tab), and background refetches don't throw, so say it here.
+	if (!module) return deleting ? null : <PaneMessage title="Modul tidak ditemukan." />;
 	return <ModuleEditor key={module.id} classId={classId} module={module} modules={modules} />;
 }

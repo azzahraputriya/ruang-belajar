@@ -163,6 +163,9 @@ type ModuleEditorProps = {
 };
 
 // Render with key={module.id}, so the form starts from the module it shows.
+// The module pane watches this, so its own delete doesn't flash "not found" on the way out.
+export const deletingModuleKey = (moduleId: ModuleId) => ["delete-module", moduleId] as const;
+
 export function ModuleEditor({ classId, module, modules }: ModuleEditorProps) {
 	const queryClient = useQueryClient();
 	const navigate = useNavigate();
@@ -177,6 +180,7 @@ export function ModuleEditor({ classId, module, modules }: ModuleEditorProps) {
 
 	// The syllabus refetches before leaving, so the class index can't resume inside this module.
 	const remove = useMutation({
+		mutationKey: deletingModuleKey(module.id),
 		mutationFn: async () => orThrow(await deleteModuleFn({ data: { moduleId: module.id } })),
 		onSuccess: async () => {
 			await queryClient.invalidateQueries({ queryKey: ["modules"] });
