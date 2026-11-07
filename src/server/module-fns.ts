@@ -1,5 +1,7 @@
-// Owns: the server functions the module and step screens call, which find the signed-in user and parse input. Not here: the module, step, and progress rules themselves (src/server/modules.ts).
+// Owns: the server functions the module and step screens call, which find the signed-in user and parse input, the queries that cache them in the browser, and turning a failed result into a thrown error for mutations. Not here: the module, step, and progress rules themselves (src/server/modules.ts).
 
+import { queryOptions } from "@tanstack/react-query";
+import { isNotFound, notFound } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
 import { type } from "arktype";
 import { ClassId, ModuleId, StepId } from "#/db/ids";
@@ -80,3 +82,57 @@ export const progressForFn = createServerFn()
 export const classProgressFn = createServerFn()
 	.validator(InClass)
 	.handler(async ({ data }) => classProgress(await requireActor(), data.classId));
+
+// Mutations throw on a failed result, so `isError` shows the form's error line.
+type Result = { ok: true } | { ok: false; reason: string };
+const isOk = <R extends Result>(result: R): result is Extract<R, { ok: true }> => result.ok;
+
+const reasonOf = (result: Result) => (result.ok ? "ok" : result.reason);
+
+export function orThrow<R extends Result>(result: R) {
+	if (isOk(result)) return result;
+	throw new Error(`Server said: ${reasonOf(result)}`);
+}
+
+// A failed read is the router's "not found", so a loader shows the pane's not-found screen.
+// Keyed by user like the class queries. Invalidate with the bare prefix after writes.
+// "Not found" won't change on a retry, so only other errors (a dropped connection) are retried.
+const retry = (failures: number, error: unknown) => !isNotFound(error) && failures < 3;
+
+export const modulesQuery = (userId: string, classId: ClassId) =>
+	queryOptions({
+		queryKey: ["modules", userId, classId],
+		retry,
+		queryFn: async () => {
+			const result = await listModulesFn({ data: { classId } });
+			if (!result.ok) throw notFound();
+			return result.modules;
+		},
+	});
+export type ModuleWithSteps = Extract<
+	Awaited<ReturnType<typeof listModules>>,
+	{ ok: true }
+>["modules"][number];
+
+// Students only. A teacher gets "forbidden", so the screens never ask for it.
+export const progressQuery = (userId: string, classId: ClassId) =>
+	queryOptions({
+		queryKey: ["progress", userId, classId],
+		retry,
+		queryFn: async () => {
+			const result = await progressForFn({ data: { classId } });
+			if (!result.ok) throw notFound();
+			return new Map(result.progress.map((p) => [p.stepId, p.status]));
+		},
+	});
+
+export const stepQuery = (userId: string, stepId: StepId) =>
+	queryOptions({
+		queryKey: ["step", userId, stepId],
+		retry,
+		queryFn: async () => {
+			const result = await getStepFn({ data: { stepId } });
+			if (!result.ok) throw notFound();
+			return result.step;
+		},
+	});

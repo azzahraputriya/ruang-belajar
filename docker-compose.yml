@@ -1,4 +1,4 @@
-# Postgres for local dev and the VPS. The port listens on localhost only.
+# Postgres for local dev and tests. The port listens on localhost only. The live app uses docker-compose.prod.yml.
 name: ruang-belajar
 
 services:

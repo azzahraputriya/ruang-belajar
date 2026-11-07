@@ -16,6 +16,7 @@ import {
 	getClass,
 	invite,
 	leaveClass,
+	listClassInvites,
 	listMembers,
 	listMyClasses,
 	listMyPendingInvites,
@@ -87,6 +88,7 @@ describe("non-members learn nothing", () => {
 		const pairs = [
 			[getClass(orang, classId), getClass(orang, missing)],
 			[listMembers(orang, classId), listMembers(orang, missing)],
+			[listClassInvites(orang, classId), listClassInvites(orang, missing)],
 			[
 				invite(orang, classId, InviteInput.assert({ username: "orang" })),
 				invite(orang, missing, InviteInput.assert({ username: "orang" })),
@@ -199,7 +201,8 @@ describe("invites", () => {
 		);
 		for (const { accepted, again, members } of runs) {
 			expect(accepted.ok).toBe(true);
-			expect(again.ok || again.reason === "already_member").toBe(true);
+			// Either order is fine: before the accept commits the old invite is still pending, after it the student is a member.
+			expect(again.ok || ["already_invited", "already_member"].includes(again.reason)).toBe(true);
 			expect(members).toBe(2);
 		}
 	});
@@ -288,6 +291,29 @@ describe("invites", () => {
 		await declineInvite(siswa, await inviteOk(guru, classId, "siswa"));
 		await acceptInvite(siswa, await inviteOk(guru, classId, "siswa"));
 		expect(await getClass(siswa, classId)).toMatchObject({ ok: true });
+	});
+
+	it("shows teachers only the pending invites of their class, newest first", async () => {
+		const { guru, classId } = await classWithStudent();
+		const [ditolak, , diterima] = await Promise.all(
+			["ditolak", "dibatalkan", "diterima", "lama", "baru"].map(makeUser),
+		);
+		await declineInvite(ditolak, await inviteOk(guru, classId, "ditolak"));
+		await revokeInvite(guru, await inviteOk(guru, classId, "dibatalkan"));
+		await acceptInvite(diterima, await inviteOk(guru, classId, "diterima"));
+		const lama = await inviteOk(guru, classId, "lama");
+		const baru = await inviteOk(guru, classId, "baru", "teacher");
+		await inviteOk(guru, await makeClass(guru, "Kimia"), "ditolak");
+		const result = await listClassInvites(guru, classId);
+		expect(result.ok && result.invites.map((i) => [i.id, i.username, i.role])).toEqual([
+			[baru, "baru", "teacher"],
+			[lama, "lama", "student"],
+		]);
+	});
+
+	it("does not show a class's invites to a student", async () => {
+		const { siswa, classId } = await classWithStudent();
+		expect(await listClassInvites(siswa, classId)).toEqual({ ok: false, reason: "forbidden" });
 	});
 
 	it("does not let a student invite", async () => {
