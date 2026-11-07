@@ -10,10 +10,10 @@ This file is the roadmap. To pick up work, take the first phase that is `in prog
 | ------------------------------- | ----------- | ------------------------- |
 | 0. Repo setup                   | done        | #1 to #5, release #6      |
 | 1. Accounts                     | done        | #7, #11, #15, release #16 |
-| 2. Deploy                       | in progress | #8, #14                   |
-| 3. Classes and invites          | in progress | #9, #18                   |
-| 4. Content: modules and steps   | in progress | #10                       |
-| 5. Quizzes                      | in progress | #12                       |
+| 2. Deploy                       | done        | #8, #14, release #20      |
+| 3. Classes and invites          | done        | #9, #18, #23, release #21 |
+| 4. Content: modules and steps   | done        | #10, #22, release #25     |
+| 5. Quizzes                      | done        | #12, #27, release #28     |
 | 6. Assignments and grading      | in progress | #13                       |
 | 7. Discussion and announcements | in progress | #17                       |
 | 8. AI tutor                     | not started |                           |
@@ -113,12 +113,17 @@ Settled by Afief, with the reason where it isn't obvious:
 - **Hosting.** The whole app runs on the VPS, not Vercel (Afief, 07 November 2026). Vercel would have to reach Postgres over the internet, which needs an open port, and the app's server code runs next to its pages.
 - **Sign-in and sign-up screens.** Mock B, a split screen with a blue panel (Afief, 07 November 2026).
 - **Class switcher.** Mock B, a Slack-style rail of class tiles (Afief, 07 November 2026).
+- **Modules and steps screens.** Mock B, a two-pane player with the syllabus beside the open step (Afief, 07 November 2026).
 - **No backups for now.** Accepted risk: if the VPS disk or the Postgres volume is lost, all accounts and class data are lost.
 - **Consent.** The tutor sends student work to an outside AI service, which counts as personal data under UU PDP (Law No. 27/2022). Afief approves the consent text and its stated purpose.
+- **Members screen.** Mock B, a side panel opened from "Anggota" in the class header (Afief, 07 November 2026).
+- **Quiz screens.** Mock B, one question at a time with numbered buttons, a result list with each answer, and a question list beside one editor for teachers (Afief, 07 November 2026).
 
 ## Open decisions
 
-None right now. Add any new question here with the phase it blocks.
+Add any new question here with the phase it blocks.
+
+- **Phase 2 checks.** Afief confirms that a test account survives a container rebuild, and that SSH to `remote-dev.afiefabd.com` still works through the tunnel. Blocks nothing.
 
 ## Constraints
 

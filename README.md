@@ -17,3 +17,5 @@ pnpm dev                # http://localhost:3000
 `pnpm test` runs against the `ruang_test` database in the same container, and empties it before each test. After changing `src/db/`, run `pnpm db:generate` and commit the new file in `drizzle/`.
 
 `pnpm check`, `pnpm typecheck`, and `pnpm test` must pass before a pull request. Agent instructions are in [`AGENTS.md`](AGENTS.md).
+
+The live app runs on the VPS in Docker. How to deploy it: [`docs/deploy.md`](docs/deploy.md).

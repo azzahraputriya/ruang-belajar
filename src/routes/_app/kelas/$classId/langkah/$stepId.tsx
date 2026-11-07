@@ -1,0 +1,66 @@
+// Owns: the step pane at /kelas/$classId/langkah/$stepId, which is the reader for students and the editor for teachers, and its not-found message. Not here: the reader (src/components/step-reader.tsx) or the editor (src/components/step-form.tsx).
+
+import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
+import { createFileRoute, getRouteApi, notFound } from "@tanstack/react-router";
+import { type } from "arktype";
+import { PaneMessage } from "#/components/pane-message";
+import { StepEditor } from "#/components/step-form";
+import { StepReader } from "#/components/step-reader";
+import { ClassId, StepId } from "#/db/ids";
+import { modulesQuery, progressQuery, stepQuery } from "#/server/module-fns";
+import { quizQuery, teacherQuizQuery } from "#/server/quiz-fns";
+
+const classRoute = getRouteApi("/_app/kelas/$classId");
+
+export const Route = createFileRoute("/_app/kelas/$classId/langkah/$stepId")({
+	// A step from another of your classes is not found here too, so the syllabus beside it always matches.
+	loader: async ({ params, parentMatchPromise, context: { queryClient, user } }) => {
+		const classId = ClassId(params.classId);
+		const stepId = StepId(params.stepId);
+		if (classId instanceof type.errors || stepId instanceof type.errors) throw notFound();
+		const [step, modules] = await Promise.all([
+			queryClient.ensureQueryData(stepQuery(user.id, stepId)),
+			queryClient.ensureQueryData(modulesQuery(user.id, classId)),
+		]);
+		if (!modules.some((m) => m.id === step.moduleId)) throw notFound();
+		// A quiz's questions come from their own query: without keys for a student, with them for a teacher.
+		if (step.kind === "quiz") {
+			const { loaderData } = await parentMatchPromise;
+			const role = loaderData?.cls.myRole;
+			if (role === "student") await queryClient.ensureQueryData(quizQuery(user.id, stepId));
+			if (role === "teacher") await queryClient.ensureQueryData(teacherQuizQuery(user.id, stepId));
+		}
+		return { classId, stepId };
+	},
+	component: StepPane,
+	notFoundComponent: () => <PaneMessage title="Langkah tidak ditemukan." />,
+});
+
+function StepPane() {
+	const { classId, stepId } = Route.useLoaderData();
+	const { user } = Route.useRouteContext();
+	const { cls } = classRoute.useLoaderData();
+	const student = cls.myRole === "student";
+	const { data: step } = useSuspenseQuery(stepQuery(user.id, stepId));
+	const { data: modules } = useSuspenseQuery(modulesQuery(user.id, classId));
+	const { data: statusById } = useQuery({ ...progressQuery(user.id, classId), enabled: student });
+
+	const module = modules.find((m) => m.id === step.moduleId);
+	// Gone after a refetch, e.g. deleted in another tab. Background refetches don't throw, so say it here.
+	if (!module) return <PaneMessage title="Langkah tidak ditemukan." />;
+	if (student) {
+		return (
+			<StepReader
+				key={step.id}
+				userId={user.id}
+				classId={classId}
+				step={step}
+				modules={modules}
+				statusById={statusById ?? new Map()}
+			/>
+		);
+	}
+	return (
+		<StepEditor key={step.id} userId={user.id} classId={classId} step={step} module={module} />
+	);
+}

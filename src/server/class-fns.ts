@@ -1,6 +1,7 @@
-// Owns: the server functions the class screens call, which find the signed-in user and parse input, plus the last-opened-class cookie and requireActor, which module-fns.ts shares. Not here: the class rules themselves (src/server/classes.ts).
+// Owns: the server functions the class screens call, which find the signed-in user and parse input, the queries that cache them in the browser, plus the last-opened-class cookie and requireActor, which module-fns.ts shares. Not here: the class rules themselves (src/server/classes.ts).
 
-import { createServerFn } from "@tanstack/react-start";
+import { queryOptions } from "@tanstack/react-query";
+import { createServerFn, createServerOnlyFn } from "@tanstack/react-start";
 import { getCookie, getRequest, setCookie } from "@tanstack/react-start/server";
 import { type } from "arktype";
 import { ClassId, InviteId, UserId } from "#/db/ids";
@@ -17,6 +18,7 @@ import {
 	getClass,
 	invite,
 	leaveClass,
+	listClassInvites,
 	listMembers,
 	listMyClasses,
 	listMyPendingInvites,
@@ -25,11 +27,12 @@ import {
 } from "#/server/classes";
 
 // Screens that call these sit behind sign-in, so a missing session is a bug, not an expected result.
-export async function requireActor() {
+// Server-only, so a browser bundle that imports this file never pulls in the session code.
+export const requireActor = createServerOnlyFn(async () => {
 	const session = await auth.api.getSession({ headers: getRequest().headers });
 	if (!session) throw new Error("Not signed in");
 	return UserId.assert(session.user.id);
-}
+});
 
 const InClass = type({ classId: ClassId });
 const ForInvite = type({ inviteId: InviteId });
@@ -54,6 +57,10 @@ export const getClassFn = createServerFn()
 export const listMembersFn = createServerFn()
 	.validator(InClass)
 	.handler(async ({ data }) => listMembers(await requireActor(), data.classId));
+
+export const listClassInvitesFn = createServerFn()
+	.validator(InClass)
+	.handler(async ({ data }) => listClassInvites(await requireActor(), data.classId));
 
 export const inviteFn = createServerFn({ method: "POST" })
 	.validator(InviteInput.merge({ classId: ClassId }))
@@ -109,4 +116,32 @@ export const setLastClassFn = createServerFn({ method: "POST" })
 			maxAge: 60 * 60 * 24 * 365,
 		});
 		return { ok: true } as const;
+	});
+
+// Keyed by user, so whoever signs in next in this tab never sees the last user's cached classes.
+// Invalidate with the bare prefix: ["classes"], ["invites"], ["members"], or ["class-invites"].
+export const myClassesQuery = (userId: string) =>
+	queryOptions({
+		queryKey: ["classes", userId],
+		queryFn: () => listMyClassesFn(),
+	});
+
+export const myInvitesQuery = (userId: string) =>
+	queryOptions({
+		queryKey: ["invites", userId],
+		queryFn: () => listMyPendingInvitesFn(),
+	});
+
+export const membersQuery = (userId: string, classId: ClassId) =>
+	queryOptions({
+		queryKey: ["members", userId, classId],
+		queryFn: () => listMembersFn({ data: { classId } }),
+	});
+
+// Students get "forbidden" from the server, so screens enable this for teachers only.
+export const classInvitesQuery = (userId: string, classId: ClassId, enabled: boolean) =>
+	queryOptions({
+		queryKey: ["class-invites", userId, classId],
+		queryFn: () => listClassInvitesFn({ data: { classId } }),
+		enabled,
 	});

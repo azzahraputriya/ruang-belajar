@@ -1,9 +1,12 @@
-// Owns: the server functions the quiz screens call, which find the signed-in user and parse input. Not here: the quiz rules and answer keys (src/server/quizzes.ts).
+// Owns: the server functions the quiz screens call, which find the signed-in user and parse input, and the queries that cache them in the browser. Not here: the quiz rules and answer keys (src/server/quizzes.ts).
 
+import { queryOptions } from "@tanstack/react-query";
+import { notFound } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
 import { type } from "arktype";
 import { QuestionId, StepId } from "#/db/ids";
 import { requireActor } from "#/server/class-fns";
+import { retry } from "#/server/module-fns";
 import {
 	AnswersInput,
 	QuestionInput,
@@ -56,3 +59,34 @@ export const reorderQuestionsFn = createServerFn({ method: "POST" })
 	.handler(async ({ data }) =>
 		reorderQuestions(await requireActor(), data.stepId, data.orderedIds),
 	);
+
+// Students only. Holds no keys until the student passes.
+export const quizQuery = (userId: string, stepId: StepId) =>
+	queryOptions({
+		queryKey: ["quiz", userId, stepId],
+		retry,
+		queryFn: async () => {
+			const result = await getQuizFn({ data: { stepId } });
+			if (!result.ok) throw notFound();
+			return result;
+		},
+	});
+export type StudentQuiz = Extract<Awaited<ReturnType<typeof getQuiz>>, { ok: true }>;
+export type QuizQuestion = StudentQuiz["questions"][number];
+export type QuizAttempt = StudentQuiz["attempts"][number];
+
+// Teachers only. Every question with its key.
+export const teacherQuizQuery = (userId: string, stepId: StepId) =>
+	queryOptions({
+		queryKey: ["teacher-quiz", userId, stepId],
+		retry,
+		queryFn: async () => {
+			const result = await teacherQuizFn({ data: { stepId } });
+			if (!result.ok) throw notFound();
+			return result.questions;
+		},
+	});
+export type TeacherQuestion = Extract<
+	Awaited<ReturnType<typeof teacherQuiz>>,
+	{ ok: true }
+>["questions"][number];
