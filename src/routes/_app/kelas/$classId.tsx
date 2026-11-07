@@ -20,7 +20,8 @@ export const Route = createFileRoute("/_app/kelas/$classId")({
 		if (classId instanceof type.errors) throw notFound();
 		const [found, members] = await Promise.all([
 			getClassFn({ data: { classId } }),
-			queryClient.ensureQueryData(membersQuery(user.id, classId)),
+			// fetchQuery, not ensureQueryData: a cached "not found" from before you (re)joined would block the page.
+			queryClient.fetchQuery(membersQuery(user.id, classId)),
 		]);
 		if (!found.ok || !members.ok) throw notFound();
 		return { cls: found.class };
