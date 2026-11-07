@@ -26,19 +26,16 @@ function Home() {
 	return (
 		<main className="mx-auto flex min-h-svh max-w-md flex-col justify-center gap-4 p-6">
 			<h1 className="text-2xl font-semibold tracking-tight">Halo, {user.name}</h1>
-			<div role="alert">
-				{signOut.isError ? (
-					<p className="text-sm text-destructive">Tidak bisa keluar sekarang. Coba lagi.</p>
-				) : null}
+			<div>
+				<div role="alert">
+					{signOut.isError ? (
+						<p className="pb-3 text-sm text-destructive">Tidak bisa keluar sekarang. Coba lagi.</p>
+					) : null}
+				</div>
+				<Button variant="outline" disabled={signOut.isPending} onClick={() => signOut.mutate()}>
+					{signOut.isPending ? "Memproses…" : "Keluar"}
+				</Button>
 			</div>
-			<Button
-				variant="outline"
-				className="self-start"
-				disabled={signOut.isPending}
-				onClick={() => signOut.mutate()}
-			>
-				{signOut.isPending ? "Memproses…" : "Keluar"}
-			</Button>
 		</main>
 	);
 }
