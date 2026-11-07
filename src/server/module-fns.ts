@@ -83,14 +83,7 @@ export const classProgressFn = createServerFn()
 	.validator(InClass)
 	.handler(async ({ data }) => classProgress(await requireActor(), data.classId));
 
-// Mutations throw on a failed result, so `isError` shows the form's error line. `reason` is kept
-// for whoever needs to tell failures apart.
-export class FailedResult extends Error {
-	constructor(readonly reason: string) {
-		super(`Server said: ${reason}`);
-	}
-}
-
+// Mutations throw on a failed result, so `isError` shows the form's error line.
 type Result = { ok: true } | { ok: false; reason: string };
 const isOk = <R extends Result>(result: R): result is Extract<R, { ok: true }> => result.ok;
 
@@ -98,7 +91,7 @@ const reasonOf = (result: Result) => (result.ok ? "ok" : result.reason);
 
 export function orThrow<R extends Result>(result: R) {
 	if (isOk(result)) return result;
-	throw new FailedResult(reasonOf(result));
+	throw new Error(`Server said: ${reasonOf(result)}`);
 }
 
 // A failed read is the router's "not found", so a loader or a refetch shows the pane's not-found
@@ -112,9 +105,10 @@ export const modulesQuery = (userId: string, classId: ClassId) =>
 			return result.modules;
 		},
 	});
-export type ModuleWithSteps = Awaited<
-	ReturnType<NonNullable<ReturnType<typeof modulesQuery>["queryFn"]>>
->[number];
+export type ModuleWithSteps = Extract<
+	Awaited<ReturnType<typeof listModules>>,
+	{ ok: true }
+>["modules"][number];
 
 // Students only. A teacher gets "forbidden", so the screens never ask for it.
 export const progressQuery = (userId: string, classId: ClassId) =>

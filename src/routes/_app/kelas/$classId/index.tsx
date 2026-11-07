@@ -5,9 +5,10 @@ import { type } from "arktype";
 import { Plus } from "lucide-react";
 import { PaneMessage } from "#/components/pane-message";
 import { buttonVariants } from "#/components/ui/button";
-import { ClassId } from "#/db/ids";
+import { ClassId, type StepId } from "#/db/ids";
 import { resumeStep } from "#/lib/reading-order";
 import { modulesQuery, progressQuery } from "#/server/module-fns";
+import type { StepStatus } from "#/server/step-kinds";
 
 export const Route = createFileRoute("/_app/kelas/$classId/")({
 	// Only reads, so a hover preload is harmless. `replace` keeps Back from bouncing here again.
@@ -18,7 +19,9 @@ export const Route = createFileRoute("/_app/kelas/$classId/")({
 		const student = loaderData.cls.myRole === "student";
 		const [modules, statusById] = await Promise.all([
 			queryClient.ensureQueryData(modulesQuery(user.id, classId)),
-			student ? queryClient.ensureQueryData(progressQuery(user.id, classId)) : new Map(),
+			student
+				? queryClient.ensureQueryData(progressQuery(user.id, classId))
+				: new Map<StepId, StepStatus>(),
 		]);
 		const step = resumeStep(modules, statusById);
 		if (step) {
