@@ -112,7 +112,7 @@ Each student's status on a step comes from their work rows:
 | Status      | When                                                                                   |
 | ----------- | -------------------------------------------------------------------------------------- |
 | not started | no `StepVisit`, `QuizAttempt`, or `Submission`                                         |
-| in progress | visited or attempted, not finished, a draft submission, or some discussion posts       |
+| in progress | visited or attempted, not finished, a draft submission, or discussion posts that count |
 | needs help  | quiz attempts used up below the pass score, or submission returned                     |
 | done        | reading/embed marked done, quiz passed, work submitted, or discussion requirements met |
 | graded      | submission graded                                                                      |
@@ -162,7 +162,7 @@ The table lives in `src/server/submission-lifecycle.ts`, with two more rows: a s
 - Only the author edits a post, which sets `editedAt`. The author or a class teacher deletes it. Deleting is soft (`deletedAt`): the post keeps its place, but reads show only that it was deleted, with no body or author, and its replies stay. Deleting twice succeeds and changes nothing.
 - Reads show the author's display name only, never their username.
 - Status counts the student's own posts that aren't deleted. A post is a thread starter. A reply counts only when it answers someone else's thread, so replying to yourself never meets the requirement. A reply still counts after its thread is deleted. Done when both counts reach the requirement, exactly at it included. The requirements are read live, so a teacher raising them moves a done student back to in progress.
-- Announcements belong to a class. Any teacher of the class writes, edits, or deletes any of them. Deleting is a hard delete. Every member reads them, newest first. They take no comments.
+- Announcements belong to a class. Only teachers write them. Only the author edits one, because reads show the author's name on it. Any teacher of the class deletes any of them. Deleting is a hard delete. Every member reads them, newest first. They take no comments.
 
 ## AI tutor
 

@@ -146,12 +146,15 @@ export async function listPosts(actor: UserId, stepId: StepId) {
 		.innerJoin(user, eq(user.id, discussionPost.authorId))
 		.where(eq(discussionPost.stepId, stepId))
 		.orderBy(asc(discussionPost.createdAt), asc(discussionPost.id));
+	const repliesTo = new Map<PostId, PostView[]>();
+	for (const row of rows) {
+		if (row.parentId === null) continue;
+		const list = repliesTo.get(row.parentId) ?? [];
+		list.push(viewOf(row, actor));
+		repliesTo.set(row.parentId, list);
+	}
 	const threads = rows
 		.filter((row) => row.parentId === null)
-		.map((row) =>
-			Object.assign(viewOf(row, actor), {
-				replies: rows.filter((r) => r.parentId === row.id).map((r) => viewOf(r, actor)),
-			}),
-		);
+		.map((row) => Object.assign(viewOf(row, actor), { replies: repliesTo.get(row.id) ?? [] }));
 	return { ok: true, threads } as const;
 }

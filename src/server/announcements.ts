@@ -12,7 +12,6 @@ export const AnnouncementInput = type({ body: type("string.trim").to("1 <= strin
 export type AnnouncementInput = typeof AnnouncementInput.infer;
 
 // Every announcement write starts here: the class lock, then the actor must teach the class.
-// Any teacher of the class may edit or delete any announcement in it, not only their own.
 async function writeAnnouncements(tx: Tx, actor: UserId, classId: ClassId) {
 	if (!(await lockClass(tx, classId))) return NOT_FOUND;
 	const role = await roleIn(tx, classId, actor);
@@ -21,13 +20,15 @@ async function writeAnnouncements(tx: Tx, actor: UserId, classId: ClassId) {
 	return OK;
 }
 
-// writeAnnouncements for the class that holds this announcement.
+// writeAnnouncements for the class that holds this announcement, along with its author.
 async function writeAnnouncement(tx: Tx, actor: UserId, id: AnnouncementId) {
 	const [found] = await tx
-		.select({ classId: announcement.classId })
+		.select({ classId: announcement.classId, authorId: announcement.authorId })
 		.from(announcement)
 		.where(eq(announcement.id, id));
-	return found ? writeAnnouncements(tx, actor, found.classId) : NOT_FOUND;
+	if (!found) return NOT_FOUND;
+	const access = await writeAnnouncements(tx, actor, found.classId);
+	return access.ok ? ({ ok: true, authorId: found.authorId } as const) : access;
 }
 
 export async function createAnnouncement(
@@ -47,6 +48,7 @@ export async function createAnnouncement(
 	});
 }
 
+// Only the author edits, because reads show the author's name on the text. Any teacher may delete.
 export async function editAnnouncement(
 	actor: UserId,
 	id: AnnouncementId,
@@ -55,6 +57,7 @@ export async function editAnnouncement(
 	return db.transaction(async (tx) => {
 		const access = await writeAnnouncement(tx, actor, id);
 		if (!access.ok) return access;
+		if (access.authorId !== actor) return fail("forbidden");
 		// No row when a parallel delete committed while we waited for the lock.
 		const [updated] = await tx
 			.update(announcement)
@@ -65,7 +68,7 @@ export async function editAnnouncement(
 	});
 }
 
-// A hard delete: announcements have no replies to keep.
+// Any teacher of the class may delete any announcement. A hard delete: there are no replies to keep.
 export async function deleteAnnouncement(actor: UserId, id: AnnouncementId) {
 	return db.transaction(async (tx) => {
 		const access = await writeAnnouncement(tx, actor, id);

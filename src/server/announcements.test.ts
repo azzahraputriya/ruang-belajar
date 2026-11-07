@@ -65,13 +65,14 @@ describe("announcements", () => {
 		expect(await bodiesFor(siswa, classId)).toEqual(["Dari guru."]);
 	});
 
-	it("can be edited and deleted by any teacher of the class", async () => {
+	it("are edited only by their author, and deleted by any teacher of the class", async () => {
 		const { guru, siswa, classId } = await classWithStudent();
 		const rekan = await makeUser("rekan");
 		await acceptInvite(rekan, await inviteOk(guru, classId, "rekan", "teacher"));
 		const id = await announceOk(guru, classId, "Ujian hari Senin.");
 
-		expect(await editAnnouncement(rekan, id, body("Ujian hari Selasa."))).toEqual({ ok: true });
+		expect(await editAnnouncement(rekan, id, body("Ujian dibatalkan."))).toEqual(forbidden);
+		expect(await editAnnouncement(guru, id, body("Ujian hari Selasa."))).toEqual({ ok: true });
 		const result = await listAnnouncements(siswa, classId);
 		if (!result.ok) throw new Error(result.reason);
 		expect(result.announcements.map((a) => a.body)).toEqual(["Ujian hari Selasa."]);

@@ -450,13 +450,16 @@ async function workInClass(classId: ClassId, studentId?: UserId) {
 		list.push(row.score);
 		scores.set(key, list);
 	}
-	return (stepId: StepId, student: UserId): StepWork => ({
-		visits: visits.get(`${stepId}/${student}`) ?? new Set(),
-		scores: scores.get(`${stepId}/${student}`) ?? [],
-		submission: submissions.get(`${stepId}/${student}`) ?? null,
-		posts: posts.get(`${stepId}/${student}`)?.posts ?? 0,
-		replies: posts.get(`${stepId}/${student}`)?.replies ?? 0,
-	});
+	return (stepId: StepId, student: UserId): StepWork => {
+		const key = `${stepId}/${student}`;
+		return {
+			visits: visits.get(key) ?? new Set(),
+			scores: scores.get(key) ?? [],
+			submission: submissions.get(key) ?? null,
+			posts: posts.get(key)?.posts ?? 0,
+			replies: posts.get(key)?.replies ?? 0,
+		};
+	};
 }
 
 // The acting student's status on every step they can see, in reading order.
