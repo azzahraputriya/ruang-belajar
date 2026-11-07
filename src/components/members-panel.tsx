@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useRouteContext, useRouter } from "@tanstack/react-router";
+import { type } from "arktype";
 import { MoreHorizontal, Users, X } from "lucide-react";
 import { useRef, useState } from "react";
 import {
@@ -67,6 +68,10 @@ const REFUSED: Record<Refusal, string> = {
 	last_teacher: "Kelas harus punya setidaknya satu guru.",
 };
 const GENERIC = "Tidak bisa sekarang. Coba lagi.";
+
+// The generated menu and dialog animate on Base UI attributes Radix never sets, so their fade lives here.
+const FADE_ZOOM =
+	"data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95";
 
 // Server functions here return refusals instead of throwing. Throwing turns them into mutation errors,
 // so each mutation handles refusals and network failures in one onError.
@@ -273,7 +278,7 @@ function PanelBody({ classId, isTeacher }: { classId: ClassId; isTeacher: boolea
 											<MoreHorizontal />
 										</Button>
 									</DropdownMenuTrigger>
-									<DropdownMenuContent align="end">
+									<DropdownMenuContent align="end" className={FADE_ZOOM}>
 										{isTeacher ? (
 											<DropdownMenuItem
 												disabled={busy}
@@ -309,6 +314,7 @@ function PanelBody({ classId, isTeacher }: { classId: ClassId; isTeacher: boolea
 			<AlertDialog open={confirm !== null} onOpenChange={(open) => !open && setConfirm(null)}>
 				<AlertDialogContent
 					size="sm"
+					className={FADE_ZOOM}
 					onCloseAutoFocus={(event) => {
 						if (!focusListAfterClose.current) return;
 						focusListAfterClose.current = false;
@@ -365,7 +371,8 @@ function InviteForm({
 
 	function onSubmit(event: React.FormEvent<HTMLFormElement>) {
 		event.preventDefault();
-		const name = username.trim();
+		// The panel shows every username with "@", so people will type it too.
+		const name = username.trim().replace(/^@/, "");
 		setMessage("");
 		if (!name) {
 			setMessage("Isi nama pengguna.");
@@ -373,7 +380,7 @@ function InviteForm({
 			return;
 		}
 		// A name that breaks the username rules can't belong to anyone, so skip the round trip.
-		if (!Username.allows(name.toLowerCase())) {
+		if (Username(name) instanceof type.errors) {
 			setMessage(REFUSED.user_not_found);
 			input.current?.focus();
 			return;
