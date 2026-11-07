@@ -14,7 +14,7 @@ This file is the roadmap. To pick up work, take the first phase that is `in prog
 | 3. Classes and invites          | in progress |                      |
 | 4. Content: modules and steps   | in progress |                      |
 | 5. Quizzes                      | in progress |                      |
-| 6. Assignments and grading      | not started |                      |
+| 6. Assignments and grading      | in progress |                      |
 | 7. Discussion and announcements | not started |                      |
 | 8. AI tutor                     | not started |                      |
 

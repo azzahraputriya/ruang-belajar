@@ -111,8 +111,8 @@ Each student's status on a step comes from their work rows:
 
 | Status      | When                                                               |
 | ----------- | ------------------------------------------------------------------ |
-| not started | no `StepVisit` and no `QuizAttempt`                                |
-| in progress | visited or attempted, not finished                                 |
+| not started | no `StepVisit`, `QuizAttempt`, or `Submission`                     |
+| in progress | visited or attempted, not finished, or a draft submission          |
 | needs help  | quiz attempts used up below the pass score, or submission returned |
 | done        | reading/embed marked done, quiz passed, or work submitted          |
 | graded      | submission graded                                                  |
@@ -142,6 +142,17 @@ The only stored status. Moves follow this table, nothing else.
 
 Lateness is computed from `submittedAt` and the module's `dueAt`.
 
+The table lives in `src/server/submission-lifecycle.ts`, with two more rows: a student can save their text or files while the work is a draft or returned. Every move takes the class lock.
+
+- `assignment` content is a markdown `prompt`, `accepts` (`text` and `files`, at least one true), and an optional rubric of 1 to 20 criteria (`id`, `title`, optional `description`, `maxPoints` 1 to 100, ids unique).
+- `reflection` content is a markdown `prompt`. It takes text only and is never graded, but a teacher can return it with a comment.
+- One submission per student per step. Each submit, return, and grade adds a row to `SubmissionEvent`, so "returned with comment X, then resubmitted" stays visible.
+- A submit needs something the step accepts: non-blank text, or at least one file.
+- A return needs a comment. A grade with a rubric gives every criterion 0 to its `maxPoints`, and the score is their sum. Without a rubric the score is 0 to 100. A comment is optional.
+- Repeating a move that already happened succeeds and changes nothing, like invites: a second submit, or a return or grade with the same comment and score. A return or grade with a different comment or score is refused. Graded is final.
+- Late means the first `submittedAt` is after `dueAt`. Exactly at `dueAt` is on time, and no `dueAt` is never late. A resubmit after a return keeps the first `submittedAt`, so asking for changes after the due date doesn't make the work late.
+- Students see only their own submission. Teachers see every current student's, drafts included.
+
 ## AI tutor
 
 - Off unless the class turns it on (`aiTutorEnabled`) and the student agrees (`aiConsentAt`).
@@ -151,6 +162,11 @@ Lateness is computed from `submittedAt` and the module's `dueAt`.
 ## Files
 
 Uploads store a storage key, not a disk path. They can start on local disk and move to object storage later with no data change.
+
+- `src/server/file-storage.ts` is the one interface (`put`, `read`, `remove`). Today it writes one file per key, named by the key, in `UPLOAD_DIR`.
+- Limits: 10 MB per file and 5 files per submission. Allowed: pdf, png, jpeg, webp, docx, xlsx, pptx, txt. The declared type, the extension, and the first bytes must all agree.
+- Upload is `POST /api/files/upload/<stepId>`, only by the student whose draft or returned work it is. Download is `GET /api/files/<fileId>`, only by that student and the class's teachers, always as an attachment with `nosniff`. Everyone else gets 404.
+- Deleting a file, or the step or module that holds it, removes the bytes from disk.
 
 ## Storage and types
 

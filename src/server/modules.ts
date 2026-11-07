@@ -1,4 +1,4 @@
-// Owns: every module, step, and step visit operation with its membership check and input rules, the step access checks quizzes reuse, plus the progress queries. Not here: each kind's content shape and status rule (src/server/step-kinds.ts), quiz questions and attempts (src/server/quizzes.ts), or session wiring (src/server/module-fns.ts).
+// Owns: every module, step, and step visit operation with its membership check and input rules, the step access checks quizzes and submissions reuse, removing a deleted step's uploads from disk, plus the progress queries. Not here: each kind's content shape and status rule (src/server/step-kinds.ts), quiz questions and attempts (src/server/quizzes.ts), submissions (src/server/submissions.ts), or session wiring (src/server/module-fns.ts).
 
 import { type } from "arktype";
 import { type Column, type SQL, and, asc, eq, gt, sql } from "drizzle-orm";
