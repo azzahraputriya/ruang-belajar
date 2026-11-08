@@ -29,6 +29,25 @@ describe("grading", () => {
 		expect(grade("multiple_choice", ["a", "c"], [])).toBe(false);
 	});
 
+	it("number refuses Infinity as an answer or a key, since JSON would store it as null", () => {
+		expect(
+			grade("number", { value: 9.8, tolerance: 0.1 }, Number.POSITIVE_INFINITY),
+		).toBeUndefined();
+		const noSet = new Set<string>();
+		expect(typeof QUESTION_KINDS.number.parseKey({ value: Number.POSITIVE_INFINITY }, noSet)).toBe(
+			"string",
+		);
+		expect(
+			typeof QUESTION_KINDS.number.parseKey(
+				{ value: 1, tolerance: Number.POSITIVE_INFINITY },
+				noSet,
+			),
+		).toBe("string");
+		expect(QUESTION_KINDS.number.parseKey({ value: 1, tolerance: 0.5 }, noSet)).toEqual({
+			key: { value: 1, tolerance: 0.5 },
+		});
+	});
+
 	it("number is right within the absolute tolerance, edges included", () => {
 		const key = { value: 9.8, tolerance: 0.1 };
 		expect(grade("number", key, 9.8)).toBe(true);

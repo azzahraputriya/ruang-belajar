@@ -5,6 +5,7 @@ import { type } from "arktype";
 import { count, eq } from "drizzle-orm";
 import { db } from "#/db/client";
 import { StepId, StorageKey, SubmissionFileId, UserId } from "#/db/ids";
+import { FILE_LIMITS, type UploadExtension, isUploadExtension } from "#/lib/upload-limits";
 import { submission, submissionFile } from "#/db/submission-schema";
 import { auth } from "#/server/auth";
 import { NOT_FOUND, fail } from "#/server/class-access";
@@ -12,8 +13,6 @@ import { removeLeftovers, storage } from "#/server/file-storage";
 import { stepFor } from "#/server/modules";
 import { decideSubmission } from "#/server/submission-lifecycle";
 import { ownSubmission, writeOwn } from "#/server/submissions";
-
-export const FILE_LIMITS = { maxBytes: 10 * 1024 * 1024, perSubmission: 5 } as const;
 
 const startsWith = (bytes: Uint8Array, prefix: readonly number[], at = 0) =>
 	prefix.every((b, i) => bytes[at + i] === b);
@@ -35,7 +34,11 @@ const isUtf8Text = (bytes: Uint8Array) => {
 
 // Every file type we take, by extension: the type the browser must declare, and a check of the first
 // bytes. A file must pass all three. Office files are zip archives, so their check is only "a zip".
-const FILE_TYPES: Record<string, { mime: string; looksRight: (bytes: Uint8Array) => boolean }> = {
+// Keyed by every extension in src/lib/upload-limits.ts, so the picker and this list never drift apart.
+const FILE_TYPES: Record<
+	UploadExtension,
+	{ mime: string; looksRight: (bytes: Uint8Array) => boolean }
+> = {
 	pdf: { mime: "application/pdf", looksRight: (b) => startsWith(b, PDF) },
 	png: { mime: "image/png", looksRight: (b) => startsWith(b, PNG) },
 	jpg: { mime: "image/jpeg", looksRight: (b) => startsWith(b, JPEG) },
@@ -72,7 +75,8 @@ export function cleanFilename(name: string) {
 // The stored type of an allowed file, or undefined. Declared type, extension, and first bytes must agree.
 export function allowedType(filename: string, declared: string, bytes: Uint8Array) {
 	const extension = filename.includes(".") ? filename.split(".").pop()?.toLowerCase() : undefined;
-	const spec = extension === undefined ? undefined : FILE_TYPES[extension];
+	const spec =
+		extension !== undefined && isUploadExtension(extension) ? FILE_TYPES[extension] : undefined;
 	const mime = declared.split(";")[0]?.trim().toLowerCase();
 	if (!spec || mime !== spec.mime || !spec.looksRight(bytes)) return undefined;
 	return spec.mime;

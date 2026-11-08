@@ -18,6 +18,11 @@ export type Choice = (typeof Choices.infer)[number];
 export const normalizeText = (text: string) =>
 	text.normalize("NFKC").trim().replace(/\s+/gu, " ").toLowerCase();
 
+// JSON has no Infinity: it would be stored as null and break every later read of the row.
+const Finite = type("number").narrow(
+	(n, ctx) => Number.isFinite(n) || ctx.mustBe("a finite number"),
+);
+
 // Floating-point slack for number answers, so 9.9 counts for 9.8 ± 0.1 (9.9 - 9.8 is 0.10000000000000142).
 // A few units of rounding error at the size of the numbers, so even huge values never gain a whole step.
 const numberSlack = (a: number, b: number) =>
@@ -88,8 +93,8 @@ export const QUESTION_KINDS = {
 	// The tolerance is absolute, in the same unit as the value.
 	number: questionKind({
 		choices: false,
-		key: type({ "+": "delete", value: "number", tolerance: ["number >= 0", "=", 0] }),
-		answer: type("number"),
+		key: type({ "+": "delete", value: Finite, tolerance: [Finite.and("number >= 0"), "=", 0] }),
+		answer: Finite,
 		grade: ({ value, tolerance }, answer) =>
 			Math.abs(answer - value) <= tolerance + numberSlack(value, answer),
 	}),

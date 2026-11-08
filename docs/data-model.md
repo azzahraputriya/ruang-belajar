@@ -17,7 +17,7 @@ Class                title, subject, aiTutorEnabled
 
 Student work, one row per thing that happened:
   StepVisit       student opened or finished a step
-  QuizAttempt     answers, score, attempt number
+  QuizAttempt     answers, which were right, score, attempt number
   Submission      text or files, status, grade, rubric scores, teacher comment
   DiscussionPost  body, optional parent post
   TutorThread     one per student per wrong question
@@ -94,7 +94,7 @@ Quiz questions are auto-graded only: single choice, multiple choice, number, sho
 - The best attempt counts. A pass closes the quiz: no more attempts after it. Out of attempts below the pass score is `needs help`.
 - Attempt numbers are given out under the class lock, so two submits at once can't share a number or go past the limit. A unique index on (step, student, attempt number) is the backstop.
 - `maxAttempts` and `passScore` are read live. A teacher who lowers the pass score passes earlier attempts that now reach it. Raising `maxAttempts` reopens a quiz that ran out, even though its solutions were shown.
-- Editing or deleting a question doesn't regrade attempts already submitted.
+- Editing or deleting a question doesn't regrade attempts already submitted. Each attempt stores which questions were right when it was graded, so its result list survives a reload and a later edit. Attempts from before that was stored show each question as unknown, not wrong.
 - Only students take quizzes. A teacher gets `forbidden` and edits through the teacher view, which includes the keys.
 
 ## Answer keys stay on the server

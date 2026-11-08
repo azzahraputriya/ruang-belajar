@@ -1,6 +1,9 @@
-// Owns: the guard for pages that need a signed-in user, which passes that user to its child routes. Not here: the pages themselves (src/routes/_app/).
+// Owns: the guard for pages that need a signed-in user, and the shell around them (class rail plus page area). Not here: the pages themselves (src/routes/_app/) or the rail's parts (src/components/).
 
-import { createFileRoute, redirect } from "@tanstack/react-router";
+import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
+import { ClassRail } from "#/components/class-rail";
+import { InviteFocusProvider } from "#/components/invite-banner";
+import { myClassesQuery, myInvitesQuery } from "#/server/class-fns";
 import { sessionQuery } from "#/server/session-fn";
 
 export const Route = createFileRoute("/_app")({
@@ -9,4 +12,24 @@ export const Route = createFileRoute("/_app")({
 		if (!user) throw redirect({ to: "/masuk" });
 		return { user };
 	},
+	loader: ({ context: { queryClient, user } }) =>
+		Promise.all([
+			queryClient.ensureQueryData(myClassesQuery(user.id)),
+			queryClient.ensureQueryData(myInvitesQuery(user.id)),
+		]),
+	component: AppShell,
 });
+
+function AppShell() {
+	const { user } = Route.useRouteContext();
+	return (
+		<InviteFocusProvider>
+			<div className="flex min-h-svh">
+				<ClassRail user={user} />
+				<main className="min-w-0 flex-1">
+					<Outlet />
+				</main>
+			</div>
+		</InviteFocusProvider>
+	);
+}

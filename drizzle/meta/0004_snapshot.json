@@ -1,5 +1,5 @@
 {
-	"id": "b0bff1bf-1460-47a7-8ad6-be17977a2458",
+	"id": "f7d905ce-a83a-4dda-ab62-6e0f7ff28f85",
 	"prevId": "93a0a791-f8c5-4f79-8f4b-9bf54815ffa5",
 	"version": "7",
 	"dialect": "postgresql",
@@ -1015,6 +1015,13 @@
 					"primaryKey": false,
 					"notNull": true
 				},
+				"results": {
+					"name": "results",
+					"type": "jsonb",
+					"primaryKey": false,
+					"notNull": true,
+					"default": "'{}'::jsonb"
+				},
 				"score": {
 					"name": "score",
 					"type": "integer",
@@ -1099,336 +1106,6 @@
 			"checkConstraints": {},
 			"isRLSEnabled": false
 		},
-		"public.submission": {
-			"name": "submission",
-			"schema": "",
-			"columns": {
-				"id": {
-					"name": "id",
-					"type": "uuid",
-					"primaryKey": true,
-					"notNull": true,
-					"default": "gen_random_uuid()"
-				},
-				"step_id": {
-					"name": "step_id",
-					"type": "uuid",
-					"primaryKey": false,
-					"notNull": true
-				},
-				"student_id": {
-					"name": "student_id",
-					"type": "text",
-					"primaryKey": false,
-					"notNull": true
-				},
-				"status": {
-					"name": "status",
-					"type": "submission_status",
-					"typeSchema": "public",
-					"primaryKey": false,
-					"notNull": true,
-					"default": "'draft'"
-				},
-				"text": {
-					"name": "text",
-					"type": "text",
-					"primaryKey": false,
-					"notNull": true,
-					"default": "''"
-				},
-				"submitted_at": {
-					"name": "submitted_at",
-					"type": "timestamp",
-					"primaryKey": false,
-					"notNull": false
-				},
-				"returned_at": {
-					"name": "returned_at",
-					"type": "timestamp",
-					"primaryKey": false,
-					"notNull": false
-				},
-				"graded_at": {
-					"name": "graded_at",
-					"type": "timestamp",
-					"primaryKey": false,
-					"notNull": false
-				},
-				"comment": {
-					"name": "comment",
-					"type": "text",
-					"primaryKey": false,
-					"notNull": false
-				},
-				"score": {
-					"name": "score",
-					"type": "integer",
-					"primaryKey": false,
-					"notNull": false
-				},
-				"rubric_scores": {
-					"name": "rubric_scores",
-					"type": "jsonb",
-					"primaryKey": false,
-					"notNull": false
-				},
-				"created_at": {
-					"name": "created_at",
-					"type": "timestamp",
-					"primaryKey": false,
-					"notNull": true,
-					"default": "now()"
-				},
-				"updated_at": {
-					"name": "updated_at",
-					"type": "timestamp",
-					"primaryKey": false,
-					"notNull": true,
-					"default": "now()"
-				}
-			},
-			"indexes": {
-				"submission_step_student_idx": {
-					"name": "submission_step_student_idx",
-					"columns": [
-						{
-							"expression": "step_id",
-							"isExpression": false,
-							"asc": true,
-							"nulls": "last"
-						},
-						{
-							"expression": "student_id",
-							"isExpression": false,
-							"asc": true,
-							"nulls": "last"
-						}
-					],
-					"isUnique": true,
-					"concurrently": false,
-					"method": "btree",
-					"with": {}
-				},
-				"submission_student_id_idx": {
-					"name": "submission_student_id_idx",
-					"columns": [
-						{
-							"expression": "student_id",
-							"isExpression": false,
-							"asc": true,
-							"nulls": "last"
-						}
-					],
-					"isUnique": false,
-					"concurrently": false,
-					"method": "btree",
-					"with": {}
-				}
-			},
-			"foreignKeys": {
-				"submission_step_id_step_id_fk": {
-					"name": "submission_step_id_step_id_fk",
-					"tableFrom": "submission",
-					"tableTo": "step",
-					"columnsFrom": ["step_id"],
-					"columnsTo": ["id"],
-					"onDelete": "cascade",
-					"onUpdate": "no action"
-				},
-				"submission_student_id_user_id_fk": {
-					"name": "submission_student_id_user_id_fk",
-					"tableFrom": "submission",
-					"tableTo": "user",
-					"columnsFrom": ["student_id"],
-					"columnsTo": ["id"],
-					"onDelete": "cascade",
-					"onUpdate": "no action"
-				}
-			},
-			"compositePrimaryKeys": {},
-			"uniqueConstraints": {},
-			"policies": {},
-			"checkConstraints": {},
-			"isRLSEnabled": false
-		},
-		"public.submission_event": {
-			"name": "submission_event",
-			"schema": "",
-			"columns": {
-				"id": {
-					"name": "id",
-					"type": "integer",
-					"primaryKey": true,
-					"notNull": true,
-					"identity": {
-						"type": "always",
-						"name": "submission_event_id_seq",
-						"schema": "public",
-						"increment": "1",
-						"startWith": "1",
-						"minValue": "1",
-						"maxValue": "2147483647",
-						"cache": "1",
-						"cycle": false
-					}
-				},
-				"submission_id": {
-					"name": "submission_id",
-					"type": "uuid",
-					"primaryKey": false,
-					"notNull": true
-				},
-				"action": {
-					"name": "action",
-					"type": "submission_action",
-					"typeSchema": "public",
-					"primaryKey": false,
-					"notNull": true
-				},
-				"comment": {
-					"name": "comment",
-					"type": "text",
-					"primaryKey": false,
-					"notNull": false
-				},
-				"score": {
-					"name": "score",
-					"type": "integer",
-					"primaryKey": false,
-					"notNull": false
-				},
-				"at": {
-					"name": "at",
-					"type": "timestamp",
-					"primaryKey": false,
-					"notNull": true,
-					"default": "now()"
-				}
-			},
-			"indexes": {
-				"submission_event_submission_id_idx": {
-					"name": "submission_event_submission_id_idx",
-					"columns": [
-						{
-							"expression": "submission_id",
-							"isExpression": false,
-							"asc": true,
-							"nulls": "last"
-						}
-					],
-					"isUnique": false,
-					"concurrently": false,
-					"method": "btree",
-					"with": {}
-				}
-			},
-			"foreignKeys": {
-				"submission_event_submission_id_submission_id_fk": {
-					"name": "submission_event_submission_id_submission_id_fk",
-					"tableFrom": "submission_event",
-					"tableTo": "submission",
-					"columnsFrom": ["submission_id"],
-					"columnsTo": ["id"],
-					"onDelete": "cascade",
-					"onUpdate": "no action"
-				}
-			},
-			"compositePrimaryKeys": {},
-			"uniqueConstraints": {},
-			"policies": {},
-			"checkConstraints": {},
-			"isRLSEnabled": false
-		},
-		"public.submission_file": {
-			"name": "submission_file",
-			"schema": "",
-			"columns": {
-				"id": {
-					"name": "id",
-					"type": "uuid",
-					"primaryKey": true,
-					"notNull": true,
-					"default": "gen_random_uuid()"
-				},
-				"submission_id": {
-					"name": "submission_id",
-					"type": "uuid",
-					"primaryKey": false,
-					"notNull": true
-				},
-				"storage_key": {
-					"name": "storage_key",
-					"type": "uuid",
-					"primaryKey": false,
-					"notNull": true
-				},
-				"filename": {
-					"name": "filename",
-					"type": "text",
-					"primaryKey": false,
-					"notNull": true
-				},
-				"mime_type": {
-					"name": "mime_type",
-					"type": "text",
-					"primaryKey": false,
-					"notNull": true
-				},
-				"size": {
-					"name": "size",
-					"type": "integer",
-					"primaryKey": false,
-					"notNull": true
-				},
-				"uploaded_at": {
-					"name": "uploaded_at",
-					"type": "timestamp",
-					"primaryKey": false,
-					"notNull": true,
-					"default": "now()"
-				}
-			},
-			"indexes": {
-				"submission_file_submission_id_idx": {
-					"name": "submission_file_submission_id_idx",
-					"columns": [
-						{
-							"expression": "submission_id",
-							"isExpression": false,
-							"asc": true,
-							"nulls": "last"
-						}
-					],
-					"isUnique": false,
-					"concurrently": false,
-					"method": "btree",
-					"with": {}
-				}
-			},
-			"foreignKeys": {
-				"submission_file_submission_id_submission_id_fk": {
-					"name": "submission_file_submission_id_submission_id_fk",
-					"tableFrom": "submission_file",
-					"tableTo": "submission",
-					"columnsFrom": ["submission_id"],
-					"columnsTo": ["id"],
-					"onDelete": "cascade",
-					"onUpdate": "no action"
-				}
-			},
-			"compositePrimaryKeys": {},
-			"uniqueConstraints": {
-				"submission_file_storage_key_unique": {
-					"name": "submission_file_storage_key_unique",
-					"nullsNotDistinct": false,
-					"columns": ["storage_key"]
-				}
-			},
-			"policies": {},
-			"checkConstraints": {},
-			"isRLSEnabled": false
-		},
 		"public.question_key": {
 			"name": "question_key",
 			"schema": "",
@@ -1491,7 +1168,7 @@
 		"public.step_kind": {
 			"name": "step_kind",
 			"schema": "public",
-			"values": ["reading", "embed", "quiz", "assignment", "reflection"]
+			"values": ["reading", "embed", "quiz"]
 		},
 		"public.visit_event": {
 			"name": "visit_event",
@@ -1502,16 +1179,6 @@
 			"name": "question_kind",
 			"schema": "public",
 			"values": ["single_choice", "multiple_choice", "number", "short_text"]
-		},
-		"public.submission_action": {
-			"name": "submission_action",
-			"schema": "public",
-			"values": ["submit", "return", "grade"]
-		},
-		"public.submission_status": {
-			"name": "submission_status",
-			"schema": "public",
-			"values": ["draft", "submitted", "returned", "graded"]
 		}
 	},
 	"schemas": {},
