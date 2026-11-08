@@ -382,6 +382,27 @@ export async function recordVisit(actor: UserId, stepId: StepId, event: VisitEve
 
 const parentPost = alias(discussionPost, "parent_post");
 
+// Each author's discussion posts that count, per step: thread starters, and replies to someone
+// else's thread. A reply to your own thread doesn't count, so a student can't meet the reply
+// requirement by talking to themselves. A reply still counts after its parent is deleted.
+// `where` narrows it, to a class, a student, or one step. Status and the teacher's Diskusi tab
+// both read it, so they always agree.
+export function countedPosts(where: SQL | undefined) {
+	return db
+		.select({
+			stepId: discussionPost.stepId,
+			studentId: discussionPost.authorId,
+			posts: sql<number>`count(*) filter (where ${discussionPost.parentId} is null)::int`,
+			replies: sql<number>`count(*) filter (where ${parentPost.authorId} <> ${discussionPost.authorId})::int`,
+		})
+		.from(discussionPost)
+		.leftJoin(parentPost, eq(parentPost.id, discussionPost.parentId))
+		.innerJoin(step, eq(step.id, discussionPost.stepId))
+		.innerJoin(moduleTable, eq(moduleTable.id, step.moduleId))
+		.where(and(where, isNull(discussionPost.deletedAt)))
+		.groupBy(discussionPost.stepId, discussionPost.authorId);
+}
+
 // What each student has done on each step of the class: the visit events, the scores of their
 // quiz attempts, their submission's status, and their discussion posts that count. One student when `studentId` is given, everyone otherwise.
 async function workInClass(classId: ClassId, studentId?: UserId) {
@@ -418,21 +439,7 @@ async function workInClass(classId: ClassId, studentId?: UserId) {
 			.innerJoin(step, eq(step.id, submission.stepId))
 			.innerJoin(moduleTable, eq(moduleTable.id, step.moduleId))
 			.where(inClass(submission.studentId)),
-		// A reply to your own thread doesn't count, so a student can't meet the reply requirement
-		// by talking to themselves. A reply still counts after its parent is deleted.
-		db
-			.select({
-				stepId: discussionPost.stepId,
-				studentId: discussionPost.authorId,
-				posts: sql<number>`count(*) filter (where ${discussionPost.parentId} is null)::int`,
-				replies: sql<number>`count(*) filter (where ${parentPost.authorId} <> ${discussionPost.authorId})::int`,
-			})
-			.from(discussionPost)
-			.leftJoin(parentPost, eq(parentPost.id, discussionPost.parentId))
-			.innerJoin(step, eq(step.id, discussionPost.stepId))
-			.innerJoin(moduleTable, eq(moduleTable.id, step.moduleId))
-			.where(and(inClass(discussionPost.authorId), isNull(discussionPost.deletedAt)))
-			.groupBy(discussionPost.stepId, discussionPost.authorId),
+		countedPosts(inClass(discussionPost.authorId)),
 	]);
 	const posts = new Map(postRows.map((row) => [`${row.stepId}/${row.studentId}`, row]));
 	const submissions = new Map(

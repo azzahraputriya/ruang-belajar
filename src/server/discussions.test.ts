@@ -1,4 +1,4 @@
-// Owns: tests for discussion steps (posting, replying, editing, deleting, reading threads) and the discussion status rule, against the test database. Not here: announcements (src/server/announcements.test.ts) or test setup (src/test/).
+// Owns: tests for discussion steps (posting, replying, editing, deleting, reading threads, answering first, the teacher's counts) and the discussion status rule, against the test database. Not here: announcements (src/server/announcements.test.ts) or test setup (src/test/).
 
 import { type } from "arktype";
 import { describe, expect, it } from "vitest";
@@ -8,6 +8,7 @@ import {
 	PostInput,
 	createPost,
 	deletePost,
+	discussionProgress,
 	editPost,
 	listPosts,
 	reply,
@@ -70,6 +71,7 @@ async function statusOf(student: UserId, classId: ClassId, stepId: StepId) {
 async function threadsOf(actor: UserId, stepId: StepId) {
 	const result = await listPosts(actor, stepId);
 	if (!result.ok) throw new Error(`listPosts failed: ${result.reason}`);
+	if (result.locked) throw new Error("listPosts is locked until this user answers first");
 	return result.threads;
 }
 
@@ -194,6 +196,7 @@ describe("discussion status", () => {
 describe("replies", () => {
 	it("are one level deep", async () => {
 		const { siswa, teman, stepId } = await classWithDiscussion();
+		await postOk(siswa, stepId);
 		const answer = await replyOk(siswa, await postOk(teman, stepId));
 		expect(await reply(teman, answer, body("Balasan ke balasan."))).toEqual({
 			ok: false,
@@ -218,7 +221,7 @@ describe("editing and deleting", () => {
 		expect(await editPost(guru, own, body("Diubah guru."))).toEqual(forbidden);
 
 		expect(await editPost(siswa, own, body("Versi baru."))).toEqual({ ok: true });
-		const [thread] = await threadsOf(teman, stepId);
+		const [thread] = await threadsOf(guru, stepId);
 		if (!thread || thread.deleted) throw new Error("thread missing");
 		expect(thread.body).toBe("Versi baru.");
 		expect(thread.editedAt).toBeInstanceOf(Date);
@@ -239,13 +242,14 @@ describe("editing and deleting", () => {
 		expect(await deletePost(siswa, first)).toEqual({ ok: true });
 		expect(await deletePost(siswa, first)).toEqual({ ok: true });
 		expect(await deletePost(guru, second)).toEqual({ ok: true });
-		const threads = await threadsOf(teman, stepId);
+		const threads = await threadsOf(guru, stepId);
 		expect(threads.map((t) => t.deleted)).toEqual([true, true]);
 	});
 
 	it("hides a deleted post's body and author but keeps its replies", async () => {
 		const { siswa, teman, stepId } = await classWithDiscussion();
 		const own = await postOk(siswa, stepId, "Rahasia.");
+		await postOk(teman, stepId);
 		await replyOk(teman, own, "Balasan.");
 		await deletePost(siswa, own);
 		const [thread] = await threadsOf(teman, stepId);
@@ -273,12 +277,25 @@ describe("reading threads", () => {
 		const [thread] = threads;
 		if (!thread || thread.deleted) throw new Error("thread missing");
 		expect(new Set(Object.keys(thread))).toEqual(
-			new Set(["id", "createdAt", "deleted", "mine", "authorName", "body", "editedAt", "replies"]),
+			new Set([
+				"id",
+				"createdAt",
+				"deleted",
+				"authorId",
+				"teacher",
+				"mine",
+				"authorName",
+				"body",
+				"editedAt",
+				"replies",
+			]),
 		);
 		expect(thread.mine).toBe(true);
-		expect(thread.replies.map((r) => !r.deleted && [r.authorName, r.body, r.mine])).toEqual([
-			["Teman Sekelas", "Satu-a.", false],
-			["guru", "Satu-b.", false],
+		expect(
+			thread.replies.map((r) => !r.deleted && [r.authorName, r.body, r.mine, r.teacher]),
+		).toEqual([
+			["Teman Sekelas", "Satu-a.", false, false],
+			["guru", "Satu-b.", false, true],
 		]);
 	});
 
@@ -295,6 +312,71 @@ describe("reading threads", () => {
 		const notDiscussion = { ok: false, reason: "not_a_discussion" };
 		expect(await listPosts(siswa, made.step.id)).toEqual(notDiscussion);
 		expect(await createPost(siswa, made.step.id, body("Halo."))).toEqual(notDiscussion);
+	});
+});
+
+describe("answering first", () => {
+	const answerFirst = { ok: false, reason: "answer_first" };
+
+	it("shows a student only the waiting count until they post, and teachers everything", async () => {
+		const { guru, siswa, teman, stepId } = await classWithDiscussion();
+		const theirs = await postOk(teman, stepId);
+		await postOk(guru, stepId);
+		await deletePost(guru, await postOk(guru, stepId));
+		expect(await listPosts(siswa, stepId)).toMatchObject({ ok: true, locked: true, waiting: 2 });
+		expect(await reply(siswa, theirs, body("Mengintip."))).toEqual(answerFirst);
+		expect(await threadsOf(guru, stepId)).toHaveLength(3);
+
+		await postOk(siswa, stepId);
+		expect(await threadsOf(siswa, stepId)).toHaveLength(4);
+		await replyOk(siswa, theirs);
+		expect(await listPosts(siswa, stepId)).toMatchObject({ counts: { posts: 1, replies: 1 } });
+	});
+
+	it("closes again when the student deletes their only thread", async () => {
+		const { siswa, teman, stepId } = await classWithDiscussion();
+		await postOk(teman, stepId);
+		const own = await postOk(siswa, stepId);
+		await deletePost(siswa, own);
+		expect(await listPosts(siswa, stepId)).toEqual({
+			ok: true,
+			locked: true,
+			waiting: 1,
+			counts: { posts: 0, replies: 0 },
+		});
+	});
+
+	it("doesn't apply when the step asks for no posts", async () => {
+		const { siswa, teman, stepId } = await classWithDiscussion({
+			requiredPosts: 0,
+			requiredReplies: 1,
+		});
+		const theirs = await postOk(teman, stepId);
+		expect(await threadsOf(siswa, stepId)).toHaveLength(1);
+		await replyOk(siswa, theirs);
+	});
+});
+
+describe("the teacher's counts", () => {
+	it("lists every current student with the posts that count, teachers only", async () => {
+		const { guru, siswa, teman, orang, stepId } = await classWithDiscussion();
+		const own = await postOk(siswa, stepId);
+		await replyOk(siswa, own);
+		await replyOk(siswa, await postOk(teman, stepId));
+		await postOk(guru, stepId);
+
+		const result = await discussionProgress(guru, stepId);
+		if (!result.ok) throw new Error(result.reason);
+		const counts = new Map(result.students.map((s) => [s.userId, [s.posts, s.replies]]));
+		expect(counts).toEqual(
+			new Map([
+				[siswa, [1, 1]],
+				[teman, [1, 0]],
+			]),
+		);
+		expect(result.students.find((s) => s.userId === teman)?.name).toBe("Teman Sekelas");
+		expect(await discussionProgress(siswa, stepId)).toEqual({ ok: false, reason: "forbidden" });
+		expect(await discussionProgress(orang, stepId)).toEqual({ ok: false, reason: "not_found" });
 	});
 });
 

@@ -1,4 +1,4 @@
-// Owns: the teacher's step editor (Tulis, Pratinjau, and Kiriman for steps that take submissions, title and kind fields, client checks) and the wiring that creates, updates, moves, or deletes a step through it, for quizzes too. Not here: each kind's fields and view (src/components/step-kinds-ui.tsx), a saved quiz's questions editor (src/components/quiz-editor.tsx), or the student's reader (src/components/step-reader.tsx).
+// Owns: the teacher's step editor (Tulis, Pratinjau, plus Kiriman for steps that take submissions or Diskusi for discussions, title and kind fields, client checks) and the wiring that creates, updates, moves, or deletes a step through it, for quizzes too. Not here: each kind's fields and view (src/components/step-kinds-ui.tsx), a saved quiz's questions editor (src/components/quiz-editor.tsx), or the student's reader (src/components/step-reader.tsx).
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
@@ -11,6 +11,7 @@ import {
 	UnsavedChangesGuard,
 	comparableStep,
 } from "#/components/editor-parts";
+import { DiscussionTab, livePostCount } from "#/components/discussion-tab";
 import { FormField } from "#/components/form-field";
 import { QuizEditor } from "#/components/quiz-editor";
 import { StepArticle } from "#/components/step-reader";
@@ -35,6 +36,7 @@ import {
 	reorderStepsFn,
 	updateStepFn,
 } from "#/server/module-fns";
+import { postsQuery } from "#/server/discussion-fns";
 import type { Step } from "#/server/modules";
 import { stepSubmissionsQuery } from "#/server/submission-fns";
 
@@ -51,10 +53,10 @@ type StepFormProps<K extends StepKind> = {
 	actionError?: Error | null;
 	// A third tab after Pratinjau. Its content sits outside the step's <form>, so its own buttons and
 	// inputs never save the step.
-	kiriman?: { label: React.ReactNode; content: React.ReactNode };
+	extraTab?: { label: React.ReactNode; content: React.ReactNode };
 };
 
-type EditorTab = "tulis" | "pratinjau" | "kiriman";
+type EditorTab = "tulis" | "pratinjau" | "extra";
 
 export function StepForm<K extends StepKind>(props: StepFormProps<K>) {
 	const { kind, initial, dueAt, onSave } = props;
@@ -96,7 +98,7 @@ export function StepForm<K extends StepKind>(props: StepFormProps<K>) {
 		<Tabs
 			value={tab}
 			onValueChange={(value) =>
-				setTab(value === "pratinjau" || value === "kiriman" ? value : "tulis")
+				setTab(value === "pratinjau" || value === "extra" ? value : "tulis")
 			}
 		>
 			<form method="post" noValidate onSubmit={onSubmit}>
@@ -112,8 +114,8 @@ export function StepForm<K extends StepKind>(props: StepFormProps<K>) {
 							<TabsList>
 								<TabsTrigger value="tulis">Tulis</TabsTrigger>
 								<TabsTrigger value="pratinjau">Pratinjau</TabsTrigger>
-								{props.kiriman ? (
-									<TabsTrigger value="kiriman">{props.kiriman.label}</TabsTrigger>
+								{props.extraTab ? (
+									<TabsTrigger value="extra">{props.extraTab.label}</TabsTrigger>
 								) : null}
 							</TabsList>
 						}
@@ -147,9 +149,9 @@ export function StepForm<K extends StepKind>(props: StepFormProps<K>) {
 				</TabsContent>
 			</form>
 			{/* Kept mounted while hidden, so a half-typed grade and the open student survive a look at Tulis. */}
-			{props.kiriman ? (
-				<TabsContent value="kiriman" forceMount className="data-[state=inactive]:hidden">
-					{props.kiriman.content}
+			{props.extraTab ? (
+				<TabsContent value="extra" forceMount className="data-[state=inactive]:hidden">
+					{props.extraTab.content}
 				</TabsContent>
 			) : null}
 		</Tabs>
@@ -229,6 +231,23 @@ export function StepEditor({ userId, classId, step, module }: StepEditorProps) {
 		enabled: takesWork,
 	});
 	const waiting = waitingOn(students, step.kind === "assignment");
+	// A discussion gets a Diskusi tab in the same slot. Its count shares the tab's query too.
+	const { data: posts } = useQuery({
+		...postsQuery(userId, step.id),
+		enabled: step.kind === "discussion",
+	});
+	const discussionTab =
+		step.kind === "discussion"
+			? {
+					label: (
+						<>
+							Diskusi{" "}
+							<span className="text-muted-foreground tabular-nums">{livePostCount(posts)}</span>
+						</>
+					),
+					content: <DiscussionTab userId={userId} stepId={step.id} required={step.content} />,
+				}
+			: undefined;
 	const kiriman = takesWork
 		? {
 				label: (
@@ -275,7 +294,7 @@ export function StepEditor({ userId, classId, step, module }: StepEditorProps) {
 			onSave={onSave}
 			actionError={actionError}
 			actions={actions}
-			kiriman={kiriman}
+			extraTab={kiriman ?? discussionTab}
 		/>
 	);
 }

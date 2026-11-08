@@ -119,6 +119,7 @@ Settled by Afief, with the reason where it isn't obvious:
 - **Members screen.** Mock B, a side panel opened from "Anggota" in the class header (Afief, 07 November 2026).
 - **Quiz screens.** Mock B, one question at a time with numbered buttons, a result list with each answer, and a question list beside one editor for teachers (Afief, 07 November 2026).
 - **Assignment screens.** Mock A for students, one sheet with the prompt, answer, files, and the teacher's comment above the answer. Mock B's class-wide "Perlu dinilai" queue for teachers (Afief, 07 November 2026).
+- **Discussion and announcement screens.** Mock C for discussions: a student answers first, enforced by the server, then sees classmates' answers below their own. Teachers read it student by student, like the Kiriman tab. Mock A for announcements: their own page, linked at the top of the syllabus (Afief, 09 November 2026).
 
 ## Open decisions
 

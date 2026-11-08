@@ -1,14 +1,15 @@
-// Owns: every discussion post operation (list threads, post, reply, edit, delete) with its membership check and input rules. Not here: the post table (src/db/discussion-schema.ts), which posts count toward a step's status (src/server/modules.ts), or session wiring (src/server/discussion-fns.ts).
+// Owns: every discussion post operation (list threads, post, reply, edit, delete) with its membership check and input rules, the answer-first rule, and the teacher's per-student counts. Not here: the post table (src/db/discussion-schema.ts), which posts count toward a step's status (src/server/modules.ts), or session wiring (src/server/discussion-fns.ts).
 
 import { type } from "arktype";
-import { asc, eq } from "drizzle-orm";
+import { and, asc, eq, isNull } from "drizzle-orm";
 import { user } from "#/db/auth-schema.gen";
+import { classMember } from "#/db/class-schema";
 import { moduleTable, step } from "#/db/content-schema";
 import { db } from "#/db/client";
 import { discussionPost } from "#/db/discussion-schema";
 import type { PostId, StepId, UserId } from "#/db/ids";
 import { type Conn, NOT_FOUND, OK, type Tx, fail, lockClass } from "#/server/class-access";
-import { stepFor } from "#/server/modules";
+import { contentOf, countedPosts, stepFor } from "#/server/modules";
 
 export const PostInput = type({ body: type("string.trim").to("1 <= string <= 10000") });
 export type PostInput = typeof PostInput.infer;
@@ -18,8 +19,33 @@ export type PostInput = typeof PostInput.infer;
 async function discussionFor(conn: Conn, actor: UserId, stepId: StepId) {
 	const access = await stepFor(conn, actor, stepId);
 	if (!access) return NOT_FOUND;
-	if (access.step.kind !== "discussion") return fail("not_a_discussion");
-	return { ok: true, role: access.role } as const;
+	const parsed = contentOf(access.step);
+	if (parsed.kind !== "discussion") return fail("not_a_discussion");
+	return { ok: true, role: access.role, classId: access.classId, content: parsed.content } as const;
+}
+type DiscussionAccess = Extract<Awaited<ReturnType<typeof discussionFor>>, { ok: true }>;
+
+// Answer first: a student sees classmates' posts, and may reply to them, only once they have a
+// thread of their own on the step, so nobody copies the first good answer. Teachers always see
+// everything, and a step that asks for no posts has nothing to answer first. Deleting your only
+// thread closes it again, so posting and deleting can't be used to peek.
+const answersFirst = (access: DiscussionAccess) =>
+	access.role === "student" && access.content.requiredPosts > 0;
+
+async function hasThread(conn: Conn, actor: UserId, stepId: StepId) {
+	const [found] = await conn
+		.select({ id: discussionPost.id })
+		.from(discussionPost)
+		.where(
+			and(
+				eq(discussionPost.stepId, stepId),
+				eq(discussionPost.authorId, actor),
+				isNull(discussionPost.parentId),
+				isNull(discussionPost.deletedAt),
+			),
+		)
+		.limit(1);
+	return found !== undefined;
 }
 
 // Every post write starts here: the class lock, then discussionFor under it. The lock keeps a
@@ -63,7 +89,7 @@ export async function createPost(actor: UserId, stepId: StepId, input: PostInput
 }
 
 // Replies to a thread. The reply takes its parent's step, so it can't land on another step.
-// Threads are one level deep, and a deleted thread takes no new replies.
+// Threads are one level deep, a deleted thread takes no new replies, and a student answers first.
 export async function reply(actor: UserId, parentId: PostId, input: PostInput) {
 	return db.transaction(async (tx) => {
 		const access = await writePost(tx, actor, parentId);
@@ -71,6 +97,9 @@ export async function reply(actor: UserId, parentId: PostId, input: PostInput) {
 		const { post } = access;
 		if (post.parentId !== null) return fail("reply_to_reply");
 		if (post.deletedAt !== null) return fail("deleted");
+		if (answersFirst(access) && !(await hasThread(tx, actor, post.stepId))) {
+			return fail("answer_first");
+		}
 		return insertPost(tx, { stepId: post.stepId, authorId: actor, parentId, body: input.body });
 	});
 }
@@ -109,7 +138,7 @@ export async function deletePost(actor: UserId, postId: PostId) {
 type PostRow = Pick<
 	typeof discussionPost.$inferSelect,
 	"id" | "authorId" | "body" | "createdAt" | "editedAt" | "deletedAt"
-> & { authorName: string };
+> & { authorName: string; authorRole: string | null };
 
 // A deleted post keeps its place in the thread but shows nothing of what or who it was.
 // Only the display name leaves the server, never the username or anything else about the author.
@@ -119,15 +148,20 @@ function viewOf(row: PostRow, actor: UserId) {
 	return {
 		...base,
 		deleted: false,
+		// An opaque id, not the username, so the teacher's Diskusi tab can pick one student's posts.
+		authorId: row.authorId,
 		mine: row.authorId === actor,
 		authorName: row.authorName,
+		// Null once the author has left the class.
+		teacher: row.authorRole === "teacher",
 		body: row.body,
 		editedAt: row.editedAt,
 	} as const;
 }
 export type PostView = ReturnType<typeof viewOf>;
 
-// Threads oldest first, each with its replies oldest first.
+// Threads oldest first, each with its replies oldest first, plus the actor's own counts. A student
+// who still has to answer first gets only how many threads are waiting.
 export async function listPosts(actor: UserId, stepId: StepId) {
 	const access = await discussionFor(db, actor, stepId);
 	if (!access.ok) return access;
@@ -137,6 +171,7 @@ export async function listPosts(actor: UserId, stepId: StepId) {
 			parentId: discussionPost.parentId,
 			authorId: discussionPost.authorId,
 			authorName: user.name,
+			authorRole: classMember.role,
 			body: discussionPost.body,
 			createdAt: discussionPost.createdAt,
 			editedAt: discussionPost.editedAt,
@@ -144,8 +179,21 @@ export async function listPosts(actor: UserId, stepId: StepId) {
 		})
 		.from(discussionPost)
 		.innerJoin(user, eq(user.id, discussionPost.authorId))
+		.leftJoin(
+			classMember,
+			and(eq(classMember.userId, discussionPost.authorId), eq(classMember.classId, access.classId)),
+		)
 		.where(eq(discussionPost.stepId, stepId))
 		.orderBy(asc(discussionPost.createdAt), asc(discussionPost.id));
+	// The actor's own counts, by the same rule as status, for their checklist.
+	const [own] = await countedPosts(
+		and(eq(discussionPost.stepId, stepId), eq(discussionPost.authorId, actor)),
+	);
+	const counts = { posts: own?.posts ?? 0, replies: own?.replies ?? 0 };
+	const starters = rows.filter((row) => row.parentId === null && row.deletedAt === null);
+	if (answersFirst(access) && !starters.some((row) => row.authorId === actor)) {
+		return { ok: true, locked: true, waiting: starters.length, counts } as const;
+	}
 	const repliesTo = new Map<PostId, PostView[]>();
 	for (const row of rows) {
 		if (row.parentId === null) continue;
@@ -156,5 +204,31 @@ export async function listPosts(actor: UserId, stepId: StepId) {
 	const threads = rows
 		.filter((row) => row.parentId === null)
 		.map((row) => Object.assign(viewOf(row, actor), { replies: repliesTo.get(row.id) ?? [] }));
-	return { ok: true, threads } as const;
+	return { ok: true, locked: false, threads, counts } as const;
+}
+
+// The teacher's Diskusi tab: every current student, by username, with their posts that count.
+export async function discussionProgress(actor: UserId, stepId: StepId) {
+	const access = await discussionFor(db, actor, stepId);
+	if (!access.ok) return access;
+	if (access.role !== "teacher") return fail("forbidden");
+	const [students, counts] = await Promise.all([
+		db
+			.select({ userId: classMember.userId, name: user.name })
+			.from(classMember)
+			.innerJoin(user, eq(user.id, classMember.userId))
+			.where(and(eq(classMember.classId, access.classId), eq(classMember.role, "student")))
+			.orderBy(asc(user.username)),
+		countedPosts(eq(discussionPost.stepId, stepId)),
+	]);
+	const countOf = new Map(counts.map((row) => [row.studentId, row]));
+	return {
+		ok: true,
+		students: students.map(({ userId, name }) => ({
+			userId,
+			name,
+			posts: countOf.get(userId)?.posts ?? 0,
+			replies: countOf.get(userId)?.replies ?? 0,
+		})),
+	} as const;
 }

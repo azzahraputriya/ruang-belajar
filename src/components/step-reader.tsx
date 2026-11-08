@@ -1,9 +1,10 @@
-// Owns: the student's view of one step (kind and due date, title, content), the "Selesai, lanjut" bar, and recording that the step was opened. Not here: each kind's content view (src/components/step-kinds-ui.tsx), the quiz screens (src/components/quiz-taker.tsx), the assignment and reflection sheet (src/components/submission-sheet.tsx), or the teacher's editor (src/components/step-form.tsx).
+// Owns: the student's view of one step (kind and due date, title, content), the "Selesai, lanjut" bar, and recording that the step was opened. Not here: each kind's content view (src/components/step-kinds-ui.tsx), the quiz screens (src/components/quiz-taker.tsx), the assignment and reflection sheet (src/components/submission-sheet.tsx), the discussion page (src/components/discussion-sheet.tsx), or the teacher's editor (src/components/step-form.tsx).
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { ArrowRight } from "lucide-react";
 import { useEffect } from "react";
+import { DiscussionSheet } from "#/components/discussion-sheet";
 import { QuizTaker } from "#/components/quiz-taker";
 import { STEP_KIND_UI, StepView, takesSubmissions } from "#/components/step-kinds-ui";
 import { SubmissionSheet } from "#/components/submission-sheet";
@@ -99,6 +100,15 @@ export function StepReader({ userId, classId, step, modules, statusById }: StepR
 					dueAt={module?.dueAt ?? null}
 					nextStepId={next?.id}
 				/>
+			</StepArticle>
+		);
+	}
+
+	// Writing the required posts is what finishes a discussion.
+	if (step.kind === "discussion") {
+		return (
+			<StepArticle kind={step.kind} title={step.title} dueAt={module?.dueAt ?? null}>
+				<DiscussionSheet userId={userId} classId={classId} step={step} nextStepId={next?.id} />
 			</StepArticle>
 		);
 	}

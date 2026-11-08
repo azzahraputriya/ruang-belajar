@@ -21,6 +21,7 @@ import { Route as AppKelasClassIdIndexRouteImport } from './routes/_app/kelas/$c
 import { Route as AppKelasClassIdLangkahBaruRouteImport } from './routes/_app/kelas/$classId/langkah-baru'
 import { Route as AppKelasClassIdModulBaruRouteImport } from './routes/_app/kelas/$classId/modul-baru'
 import { Route as AppKelasClassIdNilaiRouteImport } from './routes/_app/kelas/$classId/nilai'
+import { Route as AppKelasClassIdPengumumanRouteImport } from './routes/_app/kelas/$classId/pengumuman'
 import { Route as ApiFilesUploadStepIdRouteImport } from './routes/api/files/upload/$stepId'
 import { Route as AppKelasClassIdLangkahStepIdRouteImport } from './routes/_app/kelas/$classId/langkah/$stepId'
 import { Route as AppKelasClassIdModulModuleIdRouteImport } from './routes/_app/kelas/$classId/modul/$moduleId'
@@ -85,6 +86,12 @@ const AppKelasClassIdNilaiRoute = AppKelasClassIdNilaiRouteImport.update({
   path: '/nilai',
   getParentRoute: () => AppKelasClassIdRoute,
 } as any)
+const AppKelasClassIdPengumumanRoute =
+  AppKelasClassIdPengumumanRouteImport.update({
+    id: '/pengumuman',
+    path: '/pengumuman',
+    getParentRoute: () => AppKelasClassIdRoute,
+  } as any)
 const ApiFilesUploadStepIdRoute = ApiFilesUploadStepIdRouteImport.update({
   id: '/api/files/upload/$stepId',
   path: '/api/files/upload/$stepId',
@@ -113,6 +120,7 @@ export interface FileRoutesByFullPath {
   '/kelas/$classId/langkah-baru': typeof AppKelasClassIdLangkahBaruRoute
   '/kelas/$classId/modul-baru': typeof AppKelasClassIdModulBaruRoute
   '/kelas/$classId/nilai': typeof AppKelasClassIdNilaiRoute
+  '/kelas/$classId/pengumuman': typeof AppKelasClassIdPengumumanRoute
   '/api/files/upload/$stepId': typeof ApiFilesUploadStepIdRoute
   '/kelas/$classId/': typeof AppKelasClassIdIndexRoute
   '/kelas/$classId/langkah/$stepId': typeof AppKelasClassIdLangkahStepIdRoute
@@ -127,6 +135,7 @@ export interface FileRoutesByTo {
   '/kelas/$classId/langkah-baru': typeof AppKelasClassIdLangkahBaruRoute
   '/kelas/$classId/modul-baru': typeof AppKelasClassIdModulBaruRoute
   '/kelas/$classId/nilai': typeof AppKelasClassIdNilaiRoute
+  '/kelas/$classId/pengumuman': typeof AppKelasClassIdPengumumanRoute
   '/api/files/upload/$stepId': typeof ApiFilesUploadStepIdRoute
   '/kelas/$classId': typeof AppKelasClassIdIndexRoute
   '/kelas/$classId/langkah/$stepId': typeof AppKelasClassIdLangkahStepIdRoute
@@ -145,6 +154,7 @@ export interface FileRoutesById {
   '/_app/kelas/$classId/langkah-baru': typeof AppKelasClassIdLangkahBaruRoute
   '/_app/kelas/$classId/modul-baru': typeof AppKelasClassIdModulBaruRoute
   '/_app/kelas/$classId/nilai': typeof AppKelasClassIdNilaiRoute
+  '/_app/kelas/$classId/pengumuman': typeof AppKelasClassIdPengumumanRoute
   '/api/files/upload/$stepId': typeof ApiFilesUploadStepIdRoute
   '/_app/kelas/$classId/': typeof AppKelasClassIdIndexRoute
   '/_app/kelas/$classId/langkah/$stepId': typeof AppKelasClassIdLangkahStepIdRoute
@@ -162,6 +172,7 @@ export interface FileRouteTypes {
     | '/kelas/$classId/langkah-baru'
     | '/kelas/$classId/modul-baru'
     | '/kelas/$classId/nilai'
+    | '/kelas/$classId/pengumuman'
     | '/api/files/upload/$stepId'
     | '/kelas/$classId/'
     | '/kelas/$classId/langkah/$stepId'
@@ -176,6 +187,7 @@ export interface FileRouteTypes {
     | '/kelas/$classId/langkah-baru'
     | '/kelas/$classId/modul-baru'
     | '/kelas/$classId/nilai'
+    | '/kelas/$classId/pengumuman'
     | '/api/files/upload/$stepId'
     | '/kelas/$classId'
     | '/kelas/$classId/langkah/$stepId'
@@ -193,6 +205,7 @@ export interface FileRouteTypes {
     | '/_app/kelas/$classId/langkah-baru'
     | '/_app/kelas/$classId/modul-baru'
     | '/_app/kelas/$classId/nilai'
+    | '/_app/kelas/$classId/pengumuman'
     | '/api/files/upload/$stepId'
     | '/_app/kelas/$classId/'
     | '/_app/kelas/$classId/langkah/$stepId'
@@ -293,6 +306,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppKelasClassIdNilaiRouteImport
       parentRoute: typeof AppKelasClassIdRoute
     }
+    '/_app/kelas/$classId/pengumuman': {
+      id: '/_app/kelas/$classId/pengumuman'
+      path: '/pengumuman'
+      fullPath: '/kelas/$classId/pengumuman'
+      preLoaderRoute: typeof AppKelasClassIdPengumumanRouteImport
+      parentRoute: typeof AppKelasClassIdRoute
+    }
     '/api/files/upload/$stepId': {
       id: '/api/files/upload/$stepId'
       path: '/api/files/upload/$stepId'
@@ -321,6 +341,7 @@ interface AppKelasClassIdRouteChildren {
   AppKelasClassIdLangkahBaruRoute: typeof AppKelasClassIdLangkahBaruRoute
   AppKelasClassIdModulBaruRoute: typeof AppKelasClassIdModulBaruRoute
   AppKelasClassIdNilaiRoute: typeof AppKelasClassIdNilaiRoute
+  AppKelasClassIdPengumumanRoute: typeof AppKelasClassIdPengumumanRoute
   AppKelasClassIdIndexRoute: typeof AppKelasClassIdIndexRoute
   AppKelasClassIdLangkahStepIdRoute: typeof AppKelasClassIdLangkahStepIdRoute
   AppKelasClassIdModulModuleIdRoute: typeof AppKelasClassIdModulModuleIdRoute
@@ -330,6 +351,7 @@ const AppKelasClassIdRouteChildren: AppKelasClassIdRouteChildren = {
   AppKelasClassIdLangkahBaruRoute: AppKelasClassIdLangkahBaruRoute,
   AppKelasClassIdModulBaruRoute: AppKelasClassIdModulBaruRoute,
   AppKelasClassIdNilaiRoute: AppKelasClassIdNilaiRoute,
+  AppKelasClassIdPengumumanRoute: AppKelasClassIdPengumumanRoute,
   AppKelasClassIdIndexRoute: AppKelasClassIdIndexRoute,
   AppKelasClassIdLangkahStepIdRoute: AppKelasClassIdLangkahStepIdRoute,
   AppKelasClassIdModulModuleIdRoute: AppKelasClassIdModulModuleIdRoute,

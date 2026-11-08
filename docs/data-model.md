@@ -159,6 +159,7 @@ The table lives in `src/server/submission-lifecycle.ts`, with two more rows: a s
 
 - A post with no parent starts a thread. A reply's parent is a thread starter, so threads are one level deep. A reply takes its parent's step, so it can't land on another step. A deleted thread takes no new replies.
 - Anyone in the class who can see the step reads and writes posts, teachers included. Students see a discussion only once its module opens, like every other step.
+- Answer first: when the step requires a post, a student sees classmates' posts, and may reply, only once they have a thread of their own that isn't deleted. Until then a read returns only how many threads are waiting. Deleting your only thread closes it again. Teachers always see everything.
 - Only the author edits a post, which sets `editedAt`. The author or a class teacher deletes it. Deleting is soft (`deletedAt`): the post keeps its place, but reads show only that it was deleted, with no body or author, and its replies stay. Deleting twice succeeds and changes nothing.
 - Reads show the author's display name only, never their username.
 - Status counts the student's own posts that aren't deleted. A post is a thread starter. A reply counts only when it answers someone else's thread, so replying to yourself never meets the requirement. A reply still counts after its thread is deleted. Done when both counts reach the requirement, exactly at it included. The requirements are read live, so a teacher raising them moves a done student back to in progress.
