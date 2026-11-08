@@ -5,6 +5,7 @@ import {
 	ExternalLink,
 	FileText,
 	ListChecks,
+	MessagesSquare,
 	NotebookPen,
 	PlayCircle,
 	type LucideIcon,
@@ -143,6 +144,77 @@ function checkQuizSettings(settings: QuizSettings): FieldErrors {
 		if (!Number.isInteger(n) || n < min || n > max) errors[id] = `Isi ${min} sampai ${max}.`;
 	}
 	return errors;
+}
+
+type DiscussionContent = ContentOf<"discussion">;
+const REQUIRED_FIELDS = [
+	{ id: "requiredPosts", label: "Tanggapan wajib" },
+	{ id: "requiredReplies", label: "Balasan wajib", hint: "Ke tanggapan teman." },
+] as const;
+
+function DiscussionFields({
+	value,
+	onChange,
+	errors,
+}: {
+	value: DiscussionContent;
+	onChange: (next: DiscussionContent) => void;
+	errors: FieldErrors;
+}) {
+	return (
+		<>
+			<TextareaField
+				id="prompt"
+				label="Pertanyaan"
+				hint={MARKDOWN_HINT}
+				error={errors.prompt}
+				className="min-h-40 font-mono text-[13px] leading-6"
+				maxLength={MARKDOWN_MAX}
+				value={value.prompt}
+				onChange={(e) => onChange({ ...value, prompt: e.target.value })}
+			/>
+			<div className="grid grid-cols-[repeat(2,minmax(0,10rem))] gap-5">
+				{REQUIRED_FIELDS.map((field) => (
+					<FormField
+						key={field.id}
+						id={field.id}
+						label={field.label}
+						hint={"hint" in field ? field.hint : undefined}
+						type="number"
+						inputMode="numeric"
+						min={0}
+						max={10}
+						error={errors[field.id]}
+						value={numberValue(value[field.id])}
+						onChange={(e) => onChange({ ...value, [field.id]: e.target.valueAsNumber })}
+						className="tabular-nums"
+					/>
+				))}
+			</div>
+		</>
+	);
+}
+
+// Same rule as the server's DiscussionContent: 0 to 10 each, and at least one above zero.
+function checkDiscussion(content: DiscussionContent): FieldErrors {
+	const errors: FieldErrors = {};
+	for (const { id } of REQUIRED_FIELDS) {
+		const n = content[id];
+		if (!Number.isInteger(n) || n < 0 || n > 10) errors[id] = "Isi 0 sampai 10.";
+	}
+	if (Object.keys(errors).length === 0 && content.requiredPosts + content.requiredReplies === 0) {
+		errors.requiredPosts = "Wajibkan tanggapan, balasan, atau keduanya.";
+	}
+	return errors;
+}
+
+// "Siswa menulis 1 tanggapan dan membalas 2 teman." Zero parts are left out.
+function requirementText({ requiredPosts, requiredReplies }: DiscussionContent) {
+	const parts = [
+		requiredPosts > 0 ? `menulis ${requiredPosts} tanggapan` : "",
+		requiredReplies > 0 ? `membalas ${requiredReplies} teman` : "",
+	].filter(Boolean);
+	return parts.length > 0 ? `Siswa ${parts.join(" dan ")}.` : "";
 }
 
 // A mapped type, not a Record, so a new kind in the enum fails to compile until it has an entry,
@@ -289,6 +361,26 @@ export const STEP_KIND_UI: { [K in StepKind]: KindUi<K> } = {
 			/>
 		),
 		check: () => ({}),
+	},
+	// The student's screen is its own (src/components/discussion-sheet.tsx). View here is the
+	// teacher's Pratinjau and the new-step form.
+	discussion: {
+		label: "Diskusi",
+		Icon: MessagesSquare,
+		empty: { prompt: "", requiredPosts: 1, requiredReplies: 0 },
+		View: ({ content }) => (
+			<>
+				<Markdown>{content.prompt}</Markdown>
+				<p className="mt-4 text-xs text-muted-foreground">
+					{requirementText(content)}
+					{content.requiredPosts > 0
+						? " Jawaban teman terbuka setelah siswa menulis tanggapannya."
+						: null}
+				</p>
+			</>
+		),
+		Fields: DiscussionFields,
+		check: checkDiscussion,
 	},
 };
 

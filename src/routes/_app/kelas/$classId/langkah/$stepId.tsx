@@ -8,6 +8,7 @@ import { StepEditor } from "#/components/step-form";
 import { takesSubmissions } from "#/components/step-kinds-ui";
 import { StepReader } from "#/components/step-reader";
 import { ClassId, StepId } from "#/db/ids";
+import { postsQuery } from "#/server/discussion-fns";
 import { modulesQuery, progressQuery, stepQuery } from "#/server/module-fns";
 import { quizQuery, teacherQuizQuery } from "#/server/quiz-fns";
 import { mySubmissionQuery } from "#/server/submission-fns";
@@ -26,7 +27,7 @@ export const Route = createFileRoute("/_app/kelas/$classId/langkah/$stepId")({
 		]);
 		if (!modules.some((m) => m.id === step.moduleId)) throw notFound();
 		// A quiz's questions come from their own query: without keys for a student, with them for a teacher.
-		// A student's own submission does too.
+		// A student's own submission and a discussion's threads do too.
 		const { loaderData } = await parentMatchPromise;
 		const role = loaderData?.cls.myRole;
 		if (step.kind === "quiz") {
@@ -36,6 +37,8 @@ export const Route = createFileRoute("/_app/kelas/$classId/langkah/$stepId")({
 		if (takesSubmissions(step) && role === "student") {
 			await queryClient.ensureQueryData(mySubmissionQuery(user.id, stepId));
 		}
+		// The student's page and the teacher's tab count both read the threads.
+		if (step.kind === "discussion") await queryClient.ensureQueryData(postsQuery(user.id, stepId));
 		return { classId, stepId };
 	},
 	component: StepPane,

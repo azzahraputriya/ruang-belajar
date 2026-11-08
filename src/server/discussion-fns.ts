@@ -1,5 +1,7 @@
-// Owns: the server functions the discussion step screen calls, which find the signed-in user and parse input. Not here: the post rules themselves (src/server/discussions.ts).
+// Owns: the server functions and queries the discussion screens call, which find the signed-in user and parse input. Not here: the post rules themselves (src/server/discussions.ts).
 
+import { queryOptions } from "@tanstack/react-query";
+import { notFound } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
 import { type } from "arktype";
 import { PostId, StepId } from "#/db/ids";
@@ -8,10 +10,12 @@ import {
 	PostInput,
 	createPost,
 	deletePost,
+	discussionProgress,
 	editPost,
 	listPosts,
 	reply,
 } from "#/server/discussions";
+import { retry } from "#/server/module-fns";
 
 const ForStep = type({ stepId: StepId });
 const ForPost = type({ postId: PostId });
@@ -36,3 +40,32 @@ export const editPostFn = createServerFn({ method: "POST" })
 export const deletePostFn = createServerFn({ method: "POST" })
 	.validator(ForPost)
 	.handler(async ({ data }) => deletePost(await requireActor(), data.postId));
+
+export const discussionProgressFn = createServerFn()
+	.validator(ForStep)
+	.handler(async ({ data }) => discussionProgress(await requireActor(), data.stepId));
+
+// Both sit under ["discussion", userId, stepId], so one invalidation after a post refreshes the
+// threads and the teacher's counts.
+export const postsQuery = (userId: string, stepId: StepId) =>
+	queryOptions({
+		queryKey: ["discussion", userId, stepId],
+		retry,
+		queryFn: async () => {
+			const result = await listPostsFn({ data: { stepId } });
+			if (!result.ok) throw notFound();
+			return result;
+		},
+	});
+
+export const discussionProgressQuery = (userId: string, stepId: StepId) =>
+	queryOptions({
+		queryKey: ["discussion", userId, stepId, "progress"],
+		retry,
+		queryFn: async () => {
+			const result = await discussionProgressFn({ data: { stepId } });
+			if (!result.ok) throw notFound();
+			return result.students;
+		},
+	});
+export type Posts = Extract<Awaited<ReturnType<typeof listPosts>>, { ok: true }>;
