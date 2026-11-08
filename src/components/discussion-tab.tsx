@@ -7,16 +7,8 @@ import { PaneMessage } from "#/components/pane-message";
 import { StatusIcon } from "#/components/syllabus";
 import type { StepId } from "#/db/ids";
 import { type Posts, discussionProgressQuery, postsQuery } from "#/server/discussion-fns";
-import type { StepStatus } from "#/server/step-kinds";
 
 type Required = { requiredPosts: number; requiredReplies: number };
-type Counts = { posts: number; replies: number };
-
-// Matches the server's status rule, minus visits, which the tab doesn't load.
-function statusOf(c: Counts, req: Required): StepStatus {
-	if (c.posts >= req.requiredPosts && c.replies >= req.requiredReplies) return "done";
-	return c.posts + c.replies > 0 ? "in_progress" : "not_started";
-}
 
 // "Diskusi 9": posts that aren't deleted. A teacher is never held back by answer-first.
 export function livePostCount(posts: Posts | undefined) {
@@ -42,7 +34,7 @@ export function DiscussionTab({
 }: {
 	userId: string;
 	stepId: StepId;
-	// The saved requirement, not the one being edited: status is counted against what is saved.
+	// The saved requirement, not the one being edited, for the "1/1" counts beside a student's name.
 	required: Required;
 }) {
 	const posts = useQuery(postsQuery(userId, stepId));
@@ -58,7 +50,7 @@ export function DiscussionTab({
 
 	const threads = posts.data.threads;
 	const list = students.data;
-	const done = list.filter((s) => statusOf(s, required) === "done").length;
+	const done = list.filter((s) => s.status === "done").length;
 	// A student who left the class drops out of the list, so fall back to all threads.
 	const open = list.find((s) => s.userId === picked);
 
@@ -90,7 +82,7 @@ export function DiscussionTab({
 									onClick={() => setPicked(s.userId)}
 									className={`${ROW} ${active ? ACTIVE : ""}`}
 								>
-									<StatusIcon status={statusOf(s, required)} className="size-3.5" />
+									<StatusIcon status={s.status} className="size-3.5" />
 									<span className="min-w-0 flex-1 truncate">{s.name}</span>
 									<span className="text-xs font-normal text-muted-foreground tabular-nums">
 										{s.posts}·{s.replies}

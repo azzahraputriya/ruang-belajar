@@ -171,7 +171,13 @@ export function WriteBox({
 					{refusalMessage(send.error, refused, "Tidak bisa menyimpan. Coba lagi.")}
 				</p>
 				{onCancel ? (
-					<Button type="button" size="sm" variant="ghost" onClick={onCancel}>
+					<Button
+						type="button"
+						size="sm"
+						variant="ghost"
+						disabled={send.isPending}
+						onClick={onCancel}
+					>
 						Batal
 					</Button>
 				) : null}

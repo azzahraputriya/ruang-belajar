@@ -255,7 +255,8 @@ describe("editing and deleting", () => {
 		const [thread] = await threadsOf(teman, stepId);
 		if (!thread) throw new Error("thread missing");
 		const { replies, ...deleted } = thread;
-		expect(new Set(Object.keys(deleted))).toEqual(new Set(["id", "createdAt", "deleted"]));
+		expect(new Set(Object.keys(deleted))).toEqual(new Set(["id", "createdAt", "deleted", "mine"]));
+		expect(deleted.mine).toBe(false);
 		expect(deleted.id).toBe(own);
 		expect(deleted.deleted).toBe(true);
 		expect(replies.map((r) => !r.deleted && [r.authorName, r.body, r.mine])).toEqual([
@@ -291,6 +292,10 @@ describe("reading threads", () => {
 			]),
 		);
 		expect(thread.mine).toBe(true);
+		// Students never get an author's id. Teachers do, to pick one student's posts.
+		expect(thread.authorId).toBeNull();
+		const [teacherThread] = await threadsOf(guru, stepId);
+		expect(teacherThread && !teacherThread.deleted && teacherThread.authorId).toBe(siswa);
 		expect(
 			thread.replies.map((r) => !r.deleted && [r.authorName, r.body, r.mine, r.teacher]),
 		).toEqual([
@@ -359,7 +364,9 @@ describe("answering first", () => {
 
 describe("the teacher's counts", () => {
 	it("lists every current student with the posts that count, teachers only", async () => {
-		const { guru, siswa, teman, orang, stepId } = await classWithDiscussion();
+		const { guru, siswa, teman, orang, stepId } = await classWithDiscussion({
+			requiredReplies: 1,
+		});
 		const own = await postOk(siswa, stepId);
 		await replyOk(siswa, own);
 		await replyOk(siswa, await postOk(teman, stepId));
@@ -367,11 +374,11 @@ describe("the teacher's counts", () => {
 
 		const result = await discussionProgress(guru, stepId);
 		if (!result.ok) throw new Error(result.reason);
-		const counts = new Map(result.students.map((s) => [s.userId, [s.posts, s.replies]]));
+		const counts = new Map(result.students.map((s) => [s.userId, [s.posts, s.replies, s.status]]));
 		expect(counts).toEqual(
 			new Map([
-				[siswa, [1, 1]],
-				[teman, [1, 0]],
+				[siswa, [1, 1, "done"]],
+				[teman, [1, 0, "in_progress"]],
 			]),
 		);
 		expect(result.students.find((s) => s.userId === teman)?.name).toBe("Teman Sekelas");

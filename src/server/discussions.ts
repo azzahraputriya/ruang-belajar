@@ -10,6 +10,7 @@ import { discussionPost } from "#/db/discussion-schema";
 import type { PostId, StepId, UserId } from "#/db/ids";
 import { type Conn, NOT_FOUND, OK, type Tx, fail, lockClass } from "#/server/class-access";
 import { contentOf, countedPosts, stepFor } from "#/server/modules";
+import { discussionStatus } from "#/server/step-kinds";
 
 export const PostInput = type({ body: type("string.trim").to("1 <= string <= 10000") });
 export type PostInput = typeof PostInput.infer;
@@ -140,19 +141,19 @@ type PostRow = Pick<
 	"id" | "authorId" | "body" | "createdAt" | "editedAt" | "deletedAt"
 > & { authorName: string; authorRole: string | null };
 
-// A deleted post keeps its place in the thread but shows nothing of what or who it was.
-// Only the display name leaves the server, never the username or anything else about the author.
-function viewOf(row: PostRow, actor: UserId) {
-	const base = { id: row.id, createdAt: row.createdAt };
+// A deleted post keeps its place in the thread but shows nothing of what or who it was, except
+// telling its own author that it was theirs. Students learn only an author's display name and
+// whether they teach the class, never their username or id. Teachers also get the id, so their
+// Diskusi tab can pick one student's posts.
+function viewOf(row: PostRow, actor: UserId, teacherView: boolean) {
+	const base = { id: row.id, createdAt: row.createdAt, mine: row.authorId === actor };
 	if (row.deletedAt !== null) return { ...base, deleted: true } as const;
 	return {
 		...base,
 		deleted: false,
-		// An opaque id, not the username, so the teacher's Diskusi tab can pick one student's posts.
-		authorId: row.authorId,
-		mine: row.authorId === actor,
+		authorId: teacherView ? row.authorId : null,
 		authorName: row.authorName,
-		// Null once the author has left the class.
+		// False once the author has left the class: they no longer have a role in it.
 		teacher: row.authorRole === "teacher",
 		body: row.body,
 		editedAt: row.editedAt,
@@ -165,30 +166,34 @@ export type PostView = ReturnType<typeof viewOf>;
 export async function listPosts(actor: UserId, stepId: StepId) {
 	const access = await discussionFor(db, actor, stepId);
 	if (!access.ok) return access;
-	const rows = await db
-		.select({
-			id: discussionPost.id,
-			parentId: discussionPost.parentId,
-			authorId: discussionPost.authorId,
-			authorName: user.name,
-			authorRole: classMember.role,
-			body: discussionPost.body,
-			createdAt: discussionPost.createdAt,
-			editedAt: discussionPost.editedAt,
-			deletedAt: discussionPost.deletedAt,
-		})
-		.from(discussionPost)
-		.innerJoin(user, eq(user.id, discussionPost.authorId))
-		.leftJoin(
-			classMember,
-			and(eq(classMember.userId, discussionPost.authorId), eq(classMember.classId, access.classId)),
-		)
-		.where(eq(discussionPost.stepId, stepId))
-		.orderBy(asc(discussionPost.createdAt), asc(discussionPost.id));
-	// The actor's own counts, by the same rule as status, for their checklist.
-	const [own] = await countedPosts(
-		and(eq(discussionPost.stepId, stepId), eq(discussionPost.authorId, actor)),
-	);
+	const [rows, [own]] = await Promise.all([
+		db
+			.select({
+				id: discussionPost.id,
+				parentId: discussionPost.parentId,
+				authorId: discussionPost.authorId,
+				authorName: user.name,
+				authorRole: classMember.role,
+				body: discussionPost.body,
+				createdAt: discussionPost.createdAt,
+				editedAt: discussionPost.editedAt,
+				deletedAt: discussionPost.deletedAt,
+			})
+			.from(discussionPost)
+			.innerJoin(user, eq(user.id, discussionPost.authorId))
+			.leftJoin(
+				classMember,
+				and(
+					eq(classMember.userId, discussionPost.authorId),
+					eq(classMember.classId, access.classId),
+				),
+			)
+			.where(eq(discussionPost.stepId, stepId))
+			.orderBy(asc(discussionPost.createdAt), asc(discussionPost.id)),
+		// The actor's own counts, by the same rule as status, for their checklist.
+		countedPosts(and(eq(discussionPost.stepId, stepId), eq(discussionPost.authorId, actor))),
+	]);
+	const teacherView = access.role === "teacher";
 	const counts = { posts: own?.posts ?? 0, replies: own?.replies ?? 0 };
 	const starters = rows.filter((row) => row.parentId === null && row.deletedAt === null);
 	if (answersFirst(access) && !starters.some((row) => row.authorId === actor)) {
@@ -198,16 +203,19 @@ export async function listPosts(actor: UserId, stepId: StepId) {
 	for (const row of rows) {
 		if (row.parentId === null) continue;
 		const list = repliesTo.get(row.parentId) ?? [];
-		list.push(viewOf(row, actor));
+		list.push(viewOf(row, actor, teacherView));
 		repliesTo.set(row.parentId, list);
 	}
 	const threads = rows
 		.filter((row) => row.parentId === null)
-		.map((row) => Object.assign(viewOf(row, actor), { replies: repliesTo.get(row.id) ?? [] }));
+		.map((row) =>
+			Object.assign(viewOf(row, actor, teacherView), { replies: repliesTo.get(row.id) ?? [] }),
+		);
 	return { ok: true, locked: false, threads, counts } as const;
 }
 
-// The teacher's Diskusi tab: every current student, by username, with their posts that count.
+// The teacher's Diskusi tab: every current student, by username, with their posts that count and
+// the status they make. Visits aren't loaded, so a student who only opened the step shows as not started.
 export async function discussionProgress(actor: UserId, stepId: StepId) {
 	const access = await discussionFor(db, actor, stepId);
 	if (!access.ok) return access;
@@ -224,11 +232,11 @@ export async function discussionProgress(actor: UserId, stepId: StepId) {
 	const countOf = new Map(counts.map((row) => [row.studentId, row]));
 	return {
 		ok: true,
-		students: students.map(({ userId, name }) => ({
-			userId,
-			name,
-			posts: countOf.get(userId)?.posts ?? 0,
-			replies: countOf.get(userId)?.replies ?? 0,
-		})),
+		students: students.map(({ userId, name }) => {
+			const posts = countOf.get(userId)?.posts ?? 0;
+			const replies = countOf.get(userId)?.replies ?? 0;
+			const work = { visits: new Set<never>(), scores: [], submission: null, posts, replies };
+			return { userId, name, posts, replies, status: discussionStatus(work, access.content) };
+		}),
 	} as const;
 }

@@ -69,7 +69,8 @@ export function DiscussionSheet({
 	const { content } = step;
 	const { counts } = data;
 	const done = counts.posts >= content.requiredPosts && counts.replies >= content.requiredReplies;
-	const writeMore = counts.posts < content.requiredPosts;
+	// A reply-only step still lets students start a thread, or nobody could begin until a teacher did.
+	const writeMore = counts.posts < content.requiredPosts || content.requiredPosts === 0;
 
 	return (
 		<>
@@ -113,7 +114,8 @@ export function DiscussionSheet({
 	);
 }
 
-// Your own threads pinned on top, then everyone else's, oldest first.
+// Your own threads pinned on top, then everyone else's, oldest first. A deleted thread only keeps
+// its place while it has replies to hold.
 function Threads({
 	stepId,
 	threads,
@@ -123,8 +125,9 @@ function Threads({
 	threads: readonly Thread[];
 	writeMore: boolean;
 }) {
-	const mine = threads.filter((t) => !t.deleted && t.mine);
-	const others = threads.filter((t) => t.deleted || !t.mine);
+	const kept = threads.filter((t) => !t.deleted || t.replies.length > 0);
+	const mine = kept.filter((t) => t.mine);
+	const others = kept.filter((t) => !t.mine);
 	return (
 		<>
 			{mine.length > 0 || writeMore ? (
@@ -144,8 +147,8 @@ function Threads({
 					{writeMore ? (
 						<NewThreadBox
 							stepId={stepId}
-							label="Tanggapan lain"
-							placeholder="Tulis tanggapan lain…"
+							label={mine.length > 0 ? "Tanggapan lain" : "Tanggapan baru"}
+							placeholder={mine.length > 0 ? "Tulis tanggapan lain…" : "Tulis tanggapan…"}
 						/>
 					) : null}
 				</section>

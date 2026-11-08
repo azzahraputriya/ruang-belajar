@@ -114,7 +114,8 @@ const DiscussionContent = type({
 );
 type DiscussionContent = typeof DiscussionContent.infer;
 
-function discussionStatus(work: StepWork, content: DiscussionContent): StepStatus {
+// Exported for the teacher's Diskusi tab (src/server/discussions.ts), so it shows the same status.
+export function discussionStatus(work: StepWork, content: DiscussionContent): StepStatus {
 	const { posts, replies, visits } = work;
 	if (posts >= content.requiredPosts && replies >= content.requiredReplies) return "done";
 	if (posts > 0 || replies > 0 || visits.size > 0) return "in_progress";
