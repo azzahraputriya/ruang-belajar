@@ -34,6 +34,11 @@ export const auth = betterAuth({
 	baseURL: env.BETTER_AUTH_URL,
 	secret: env.BETTER_AUTH_SECRET,
 	database: drizzleAdapter(db, { provider: "pg", schema }),
+	// Rate limits count per visitor IP. In production every request arrives through the Cloudflare
+	// Tunnel, which sets cf-connecting-ip and overwrites any value a visitor sends. That only holds
+	// because the app listens on 127.0.0.1 alone (docker-compose.prod.yml), so nothing skips the tunnel.
+	// Without the header, as in local dev, all visitors share one limit per path.
+	advanced: { ipAddress: { ipAddressHeaders: ["cf-connecting-ip"] } },
 	emailAndPassword: {
 		enabled: true,
 		minPasswordLength: PASSWORD.min,

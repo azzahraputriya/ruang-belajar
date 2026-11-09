@@ -3,6 +3,7 @@
 The live app runs on the VPS as two containers from `docker-compose.prod.yml`: the app and its own Postgres. It is a separate compose project (`ruang-belajar-prod`) from the dev database in `docker-compose.yml`, so the two never share data.
 
 - The app listens on `127.0.0.1:3300` only. The outside world reaches it through the Cloudflare Tunnel at `https://lms.afiefabd.com`.
+- Sign-in rate limits count per visitor, by the `cf-connecting-ip` header Cloudflare sets. Never publish the app's port beyond `127.0.0.1`: anyone reaching it directly could send that header themselves and dodge the limit.
 - Postgres has no port on the host. Only the app container can reach it.
 - On every start, the app container applies any new migrations from `drizzle/` and then starts the server.
 - Both containers restart on their own after a crash or a reboot.
