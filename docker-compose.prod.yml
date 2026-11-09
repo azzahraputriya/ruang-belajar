@@ -23,13 +23,15 @@ services:
         condition: service_healthy
     # Healthy only once the server answers. The container runs the migrations first, so without this
     # `up --wait` returned while nothing was listening yet. Node's own fetch, so the image needs no curl.
+    # It sends cf-connecting-ip like the tunnel does, so it doesn't trigger better-auth's missing-IP warning,
+    # which is logged once per start.
     healthcheck:
       test:
         [
           "CMD",
           "node",
           "-e",
-          "fetch('http://127.0.0.1:3000/api/auth/get-session').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))",
+          "fetch('http://127.0.0.1:3000/api/auth/get-session', { headers: { 'cf-connecting-ip': '127.0.0.1' } }).then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))",
         ]
       interval: 2s
       timeout: 3s
