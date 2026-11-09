@@ -296,7 +296,7 @@ describe("invites", () => {
 	it("shows teachers only the pending invites of their class, newest first", async () => {
 		const { guru, classId } = await classWithStudent();
 		const [ditolak, , diterima] = await Promise.all(
-			["ditolak", "dibatalkan", "diterima", "lama", "baru"].map(makeUser),
+			["ditolak", "dibatalkan", "diterima", "lama", "baru"].map((u) => makeUser(u)),
 		);
 		await declineInvite(ditolak, await inviteOk(guru, classId, "ditolak"));
 		await revokeInvite(guru, await inviteOk(guru, classId, "dibatalkan"));

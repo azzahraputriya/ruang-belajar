@@ -15,7 +15,7 @@ This file is the roadmap. To pick up work, take the first phase that is `in prog
 | 4. Content: modules and steps   | done        | #10, #22, release #25      |
 | 5. Quizzes                      | done        | #12, #27, release #28      |
 | 6. Assignments and grading      | done        | #13, #30, #31, release #32 |
-| 7. Discussion and announcements | in progress | #17                        |
+| 7. Discussion and announcements | in review   | #17, #34, release #35      |
 | 8. AI tutor                     | not started |                            |
 
 Phases 1 to 8 each end in a working, tested slice. Phase 2 can run alongside phase 3.
@@ -119,6 +119,7 @@ Settled by Afief, with the reason where it isn't obvious:
 - **Members screen.** Mock B, a side panel opened from "Anggota" in the class header (Afief, 07 November 2026).
 - **Quiz screens.** Mock B, one question at a time with numbered buttons, a result list with each answer, and a question list beside one editor for teachers (Afief, 07 November 2026).
 - **Assignment screens.** Mock A for students, one sheet with the prompt, answer, files, and the teacher's comment above the answer. Mock B's class-wide "Perlu dinilai" queue for teachers (Afief, 07 November 2026).
+- **Discussion and announcement screens.** Mock C for discussions: a student answers first, enforced by the server, then sees classmates' answers below their own. Teachers read it student by student, like the Kiriman tab. Mock A for announcements: their own page, linked at the top of the syllabus (Afief, 09 November 2026).
 
 ## Open decisions
 
