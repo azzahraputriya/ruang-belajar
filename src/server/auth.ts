@@ -39,6 +39,15 @@ export const auth = betterAuth({
 	// holds because the app listens on 127.0.0.1 alone (docker-compose.prod.yml), so nothing skips the
 	// tunnel. A live request without the header shares one limit per path with every other such request.
 	advanced: { ipAddress: { ipAddressHeaders: ["cf-connecting-ip"] } },
+	// better-auth allows 3 sign-ins or sign-ups per 10 seconds per IP. A class on school Wi-Fi shares
+	// one IP, so 30 students starting together would mostly be refused. 30 a minute lets a class in
+	// while still slowing down password guessing from one address.
+	rateLimit: {
+		customRules: {
+			"/sign-in/username": { window: 60, max: 30 },
+			"/sign-up/email": { window: 60, max: 30 },
+		},
+	},
 	emailAndPassword: {
 		enabled: true,
 		minPasswordLength: PASSWORD.min,
