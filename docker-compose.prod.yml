@@ -23,7 +23,8 @@ services:
         condition: service_healthy
     # Healthy only once the server answers. The container runs the migrations first, so without this
     # `up --wait` returned while nothing was listening yet. Node's own fetch, so the image needs no curl.
-    # It sends cf-connecting-ip like the tunnel does, so a missing-IP warning in the logs means a real request.
+    # It sends cf-connecting-ip like the tunnel does, so it doesn't trigger better-auth's missing-IP warning,
+    # which is logged once per start.
     healthcheck:
       test:
         [

@@ -39,7 +39,7 @@ Postgres saves the password the first time the volume is created. If you deploy 
 
 ```bash
 docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
-curl -fsS http://127.0.0.1:3300/api/auth/get-session   # prints null with a 200
+curl -fsS -H "cf-connecting-ip: 127.0.0.1" http://127.0.0.1:3300/api/auth/get-session   # prints null with a 200
 ```
 
 ## Redeploy after a merge
